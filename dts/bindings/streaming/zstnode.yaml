@@ -1,0 +1,17 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Base binding for zstnode streaming node devices.
+  All zstnode driver bindings should include this file.
+
+compatible: "zstreamer,zstnode"
+
+include: base.yaml
+
+properties:
+  children:
+    type: phandles
+    description: |
+      Downstream node(s) that this node sends buffers to.
+      For fan-out, list multiple phandles.

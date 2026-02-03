@@ -1,0 +1,22 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  zstreamer sink node. Sink nodes run in their own thread and
+  consume buffers by blocking on their fifo and calling the
+  driver's process callback for each received buffer.
+
+compatible: "zstreamer,zstsink"
+
+include: zstnode.yaml
+
+properties:
+  thread-stack-size:
+    type: int
+    default: 1024
+    description: Stack size in bytes for the sink thread.
+
+  thread-priority:
+    type: int
+    default: 5
+    description: Priority of the sink thread.

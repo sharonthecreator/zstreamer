@@ -1,0 +1,7 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  drivers.zstnode:
+    tags: drivers zstnode zstreamer
+    depends_on: []
