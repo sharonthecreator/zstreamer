@@ -1,0 +1,21 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  zstreamer source node. Source nodes run in their own thread and
+  produce buffers by calling the driver's run callback in a loop.
+
+compatible: "zstreamer,zstsrc"
+
+include: zstnode.yaml
+
+properties:
+  thread-stack-size:
+    type: int
+    default: 1024
+    description: Stack size in bytes for the source thread.
+
+  thread-priority:
+    type: int
+    default: 5
+    description: Priority of the source thread.

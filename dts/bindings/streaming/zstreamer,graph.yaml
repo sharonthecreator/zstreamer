@@ -1,0 +1,31 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  zstreamer graph container node. Child nodes represent streaming
+  pipeline nodes (sources, sinks, generic processors). The graph
+  owns a net_buf_pool shared by all its children.
+
+compatible: "zstreamer,graph"
+
+include: base.yaml
+
+properties:
+  buf-num:
+    type: int
+    default: 8
+    description: Number of buffers in the graph net_buf pool.
+
+  buffer-size:
+    type: int
+    default: 2048
+    description: Size in bytes of each buffer in the graph net_buf pool.
+
+  "#address-cells":
+    type: int
+    const: 1
+
+  "#size-cells":
+    type: int
+    const: 0
+

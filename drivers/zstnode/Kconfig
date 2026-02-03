@@ -1,0 +1,17 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+menuconfig ZSTNODE
+	bool "zstnode driver support"
+	depends on ZSTREAMER
+	help
+	  Enable zstnode driver subsystem. zstnode is the driver type
+	  for streaming nodes in the zstreamer framework.
+
+if ZSTNODE
+
+module = ZSTNODE
+module-str = zstnode
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # ZSTNODE
