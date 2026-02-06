@@ -1,0 +1,12 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: SPI-to-SPI relay
+  description: |
+    Reads data from one SPI bus and writes it to another using a
+    zstreamer graph with zstsrc-spi and zstsink-spi nodes.
+tests:
+  sample.zstreamer.spi2spi:
+    tags: zstreamer spi
+    platform_allow: native_sim nucleo_u575zi_q

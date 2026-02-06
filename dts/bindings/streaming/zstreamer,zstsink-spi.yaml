@@ -1,0 +1,34 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  SPI sink node. Writes received buffer data to an SPI device
+  (as master).
+
+compatible: "zstreamer,zstsink-spi"
+
+include: zstreamer,zstsink.yaml
+
+properties:
+  spi-device:
+    type: phandle
+    required: true
+    description: Phandle to the SPI bus controller.
+
+  spi-cs-gpios:
+    type: phandle-array
+    description: |
+      GPIO for chip select. If not specified, hardware CS is used.
+
+  spi-max-frequency:
+    type: int
+    default: 1000000
+    description: Maximum SPI clock frequency in Hz.
+
+  spi-cpol:
+    type: boolean
+    description: Set clock polarity (CPOL=1).
+
+  spi-cpha:
+    type: boolean
+    description: Set clock phase (CPHA=1).
