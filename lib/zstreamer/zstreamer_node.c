@@ -5,7 +5,7 @@
 
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
-#include <zephyr/net/buf.h>
+#include <zephyr/net_buf.h>
 #include <zephyr/logging/log.h>
 
 #include <zephyr/drivers/zstnode.h>

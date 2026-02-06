@@ -13,7 +13,7 @@
 
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
-#include <zephyr/net/buf.h>
+#include <zephyr/net_buf.h>
 #include <zephyr/sys/atomic.h>
 
 #ifdef __cplusplus

@@ -13,7 +13,7 @@
 
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
-#include <zephyr/net/buf.h>
+#include <zephyr/net_buf.h>
 #include <zephyr/sys/atomic.h>
 
 #ifdef __cplusplus
@@ -159,9 +159,9 @@ static inline int zstnode_common_init(const struct device *dev)
 #define Z_ZSTNODE_INIT_WRAPPER_DEFINE(inst, _driver_init)                      \
 	static int zstnode_init_##inst(const struct device *dev)               \
 	{                                                                      \
-		int ret = 0;                                                   \
-		if (_driver_init != NULL) {                                    \
-			ret = _driver_init(dev);                               \
+		int (*init_fn)(const struct device *) = _driver_init;          \
+		if (init_fn != NULL) {                                         \
+			int ret = init_fn(dev);                                \
 			if (ret != 0) {                                        \
 				return ret;                                    \
 			}                                                      \
