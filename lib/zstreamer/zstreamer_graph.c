@@ -4,7 +4,7 @@
  */
 
 #include <zephyr/device.h>
-#include <zephyr/net/buf.h>
+#include <zephyr/net_buf.h>
 #include <zephyr/logging/log.h>
 
 #include <zstreamer/zstreamer.h>
@@ -21,7 +21,7 @@ LOG_MODULE_REGISTER(zstreamer_graph, CONFIG_ZSTREAMER_LOG_LEVEL);
 		0, NULL)
 
 #define GRAPH_DEVICE_DEFINE(inst)                                              \
-	GRAPH_POOL_DEFINE(inst)                                                \
+	GRAPH_POOL_DEFINE(inst);                                               \
 	static const struct zstreamer_graph_config                              \
 		graph_config_##inst = {                                        \
 		.pool = &graph_pool_##inst,                                    \
