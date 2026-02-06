@@ -1,0 +1,12 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: UART-to-UART relay
+  description: |
+    Relays bytes received on one UART to another using a
+    zstreamer graph with zstsrc-uart and zstsink-uart nodes.
+tests:
+  sample.zstreamer.uart2uart:
+    tags: zstreamer uart
+    platform_allow: native_sim nucleo_u575zi_q
