@@ -1,0 +1,10 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Fake sink node. Discards all received buffer data.
+  Software-only test node.
+
+compatible: "zstreamer,zstsink-fake"
+
+include: zstreamer,zstsink.yaml

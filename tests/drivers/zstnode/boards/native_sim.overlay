@@ -1,0 +1,62 @@
+/*
+ * Copyright (c) 2026 zstreamer contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	uart_src: uart-emul-src {
+		compatible = "zephyr,uart-emul";
+		current-speed = <115200>;
+		rx-fifo-size = <32768>;
+		tx-fifo-size = <32768>;
+		status = "okay";
+	};
+
+	uart_sink: uart-emul-sink {
+		compatible = "zephyr,uart-emul";
+		current-speed = <115200>;
+		rx-fifo-size = <32768>;
+		tx-fifo-size = <32768>;
+		status = "okay";
+	};
+
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		buf-num = <8>;
+		buffer-size = <1024>;
+
+		uart_source: uart-source@0 {
+			compatible = "zstreamer,zstsrc-uart";
+			reg = <0>;
+			uart-device = <&uart_src>;
+			children = <&uart_sinker>;
+			thread-stack-size = <1024>;
+			thread-priority = <5>;
+		};
+
+		uart_sinker: uart-sinker@1 {
+			compatible = "zstreamer,zstsink-uart";
+			reg = <1>;
+			uart-device = <&uart_sink>;
+			thread-stack-size = <1024>;
+			thread-priority = <5>;
+		};
+
+		numgen_source: numgen-source@2 {
+			compatible = "zstreamer,zstsrc-numgen";
+			reg = <2>;
+			children = <&fake_sinker>;
+			thread-stack-size = <1024>;
+			thread-priority = <5>;
+		};
+
+		fake_sinker: fake-sinker@3 {
+			compatible = "zstreamer,zstsink-fake";
+			reg = <3>;
+			thread-stack-size = <1024>;
+			thread-priority = <5>;
+		};
+	};
+};

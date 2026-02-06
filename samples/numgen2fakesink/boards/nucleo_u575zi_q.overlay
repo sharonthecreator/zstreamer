@@ -1,0 +1,28 @@
+/*
+ * Copyright (c) 2026 zstreamer contributors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Number generator to fake sink on Nucleo U575ZI-Q.
+ * Software-only pipeline — no hardware dependencies.
+ */
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		buf-num = <8>;
+		buffer-size = <128>;
+
+		numgen_source: numgen-source@0 {
+			compatible = "zstreamer,zstsrc-numgen";
+			reg = <0>;
+			children = <&fake_sinker>;
+		};
+
+		fake_sinker: fake-sinker@1 {
+			compatible = "zstreamer,zstsink-fake";
+			reg = <1>;
+		};
+	};
+};
