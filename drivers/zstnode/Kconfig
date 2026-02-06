@@ -14,4 +14,12 @@ module = ZSTNODE
 module-str = zstnode
 source "subsys/logging/Kconfig.template.log_config"
 
+rsource "uart/Kconfig"
+
+rsource "spi/Kconfig"
+
+rsource "adc/Kconfig"
+
+rsource "test/Kconfig"
+
 endif # ZSTNODE
