@@ -1,0 +1,12 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: Number generator to fake sink
+  description: |
+    Demonstrates a software-only streaming pipeline using zstsrc-numgen
+    (generates sequential bytes 0-255) piped to zstsink-fake (discards data).
+tests:
+  sample.zstreamer.numgen2fakesink:
+    tags: zstreamer
+    platform_allow: native_sim nucleo_u575zi_q
