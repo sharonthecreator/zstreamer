@@ -1,0 +1,41 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  SPI source node. Reads bytes from an SPI device (as master)
+  and submits them as buffers to downstream children.
+
+compatible: "zstreamer,zstsrc-spi"
+
+include: zstreamer,zstsrc.yaml
+
+properties:
+  spi-device:
+    type: phandle
+    required: true
+    description: Phandle to the SPI bus controller.
+
+  spi-cs-gpios:
+    type: phandle-array
+    description: |
+      GPIO for chip select. If not specified, hardware CS is used.
+
+  spi-max-frequency:
+    type: int
+    default: 1000000
+    description: Maximum SPI clock frequency in Hz.
+
+  spi-cpol:
+    type: boolean
+    description: Set clock polarity (CPOL=1).
+
+  spi-cpha:
+    type: boolean
+    description: Set clock phase (CPHA=1).
+
+  rx-length:
+    type: int
+    default: 64
+    description: |
+      Number of bytes to read in each SPI transaction.
+      For continuous streaming, set this to the expected frame size.

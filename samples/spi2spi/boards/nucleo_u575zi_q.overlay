@@ -1,0 +1,62 @@
+/*
+ * Copyright (c) 2026 zstreamer contributors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * SPI-to-SPI relay on Nucleo U575ZI-Q with DMA support.
+ *
+ * Source: SPI1 (PA5 SCK / PA6 MISO / PA7 MOSI) — Arduino D13/D12/D11
+ * Sink:   SPI3 (PC10 SCK / PC11 MISO / PC12 MOSI) — Morpho CN11
+ *
+ * Connect an SPI slave device to SPI1 to read data;
+ * the pipeline writes it out on SPI3.
+ *
+ * DMA is automatically used when CONFIG_SPI_ASYNC is enabled.
+ */
+
+&spi1 {
+	status = "okay";
+	pinctrl-0 = <&spi1_sck_pa5 &spi1_miso_pa6 &spi1_mosi_pa7>;
+	pinctrl-names = "default";
+	dmas = <&gpdma1 0 6 STM32_DMA_PERIPH_TX>,
+	       <&gpdma1 1 7 STM32_DMA_PERIPH_RX>;
+	dma-names = "tx", "rx";
+};
+
+&spi3 {
+	status = "okay";
+	pinctrl-0 = <&spi3_sck_pc10 &spi3_miso_pc11 &spi3_mosi_pc12>;
+	pinctrl-names = "default";
+	dmas = <&gpdma1 2 8 STM32_DMA_PERIPH_TX>,
+	       <&gpdma1 3 9 STM32_DMA_PERIPH_RX>;
+	dma-names = "tx", "rx";
+};
+
+&gpdma1 {
+	status = "okay";
+};
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		buf-num = <8>;
+		buffer-size = <128>;
+
+		spi_source: spi-source@0 {
+			compatible = "zstreamer,zstsrc-spi";
+			reg = <0>;
+			spi-device = <&spi1>;
+			spi-max-frequency = <1000000>;
+			rx-length = <64>;
+			children = <&spi_sinker>;
+		};
+
+		spi_sinker: spi-sinker@1 {
+			compatible = "zstreamer,zstsink-spi";
+			reg = <1>;
+			spi-device = <&spi3>;
+			spi-max-frequency = <1000000>;
+		};
+	};
+};
