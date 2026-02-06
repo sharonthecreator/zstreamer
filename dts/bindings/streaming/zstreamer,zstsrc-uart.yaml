@@ -1,0 +1,16 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  UART source node. Reads bytes from a UART device using poll_in
+  and submits them as buffers to downstream children.
+
+compatible: "zstreamer,zstsrc-uart"
+
+include: zstreamer,zstsrc.yaml
+
+properties:
+  uart-device:
+    type: phandle
+    required: true
+    description: Phandle to the UART device to read from.

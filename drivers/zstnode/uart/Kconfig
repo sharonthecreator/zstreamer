@@ -1,0 +1,51 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTNODE_UART_SRC
+	bool "UART source zstnode driver"
+	default y
+	depends on DT_HAS_ZSTREAMER_ZSTSRC_UART_ENABLED
+	depends on ZSTNODE
+	depends on SERIAL
+	help
+	  Enable the UART source streaming node driver.
+	  Reads bytes from a UART device and submits them
+	  as buffers into the streaming graph.
+
+config ZSTNODE_UART_SINK
+	bool "UART sink zstnode driver"
+	default y
+	depends on DT_HAS_ZSTREAMER_ZSTSINK_UART_ENABLED
+	depends on ZSTNODE
+	depends on SERIAL
+	help
+	  Enable the UART sink streaming node driver.
+	  Writes received buffer data to a UART device.
+
+config ZSTNODE_UART_DMA
+	bool "UART DMA/async support for zstnode"
+	default y
+	depends on UART_ASYNC_API
+	depends on (ZSTNODE_UART_SRC || ZSTNODE_UART_SINK)
+	help
+	  Enable DMA/async UART support for zstnode drivers.
+	  When enabled, UART source and sink nodes will automatically
+	  use DMA transfers when available, falling back to polling
+	  if the UART device doesn't support async API.
+
+config ZSTNODE_UART_DMA_MAX_CONTEXTS
+	int "Maximum number of UART DMA contexts"
+	default 4
+	depends on ZSTNODE_UART_DMA
+	help
+	  Maximum number of UART devices that can simultaneously use
+	  DMA with the shared context system. Each UART device that
+	  has both a source and sink node sharing DMA uses one context.
+
+config ZSTNODE_UART_DMA_RX_BUF_SIZE
+	int "UART DMA RX buffer size"
+	default 256
+	depends on ZSTNODE_UART_DMA
+	help
+	  Size in bytes of the DMA receive buffer for UART source nodes.
+	  Larger buffers can reduce interrupt overhead but use more RAM.
