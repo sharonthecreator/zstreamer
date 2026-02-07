@@ -11,30 +11,22 @@
 
 LOG_MODULE_REGISTER(uart2uart, LOG_LEVEL_INF);
 
-#define SRC_NODE  DT_NODELABEL(uart_source)
-#define SINK_NODE DT_NODELABEL(uart_sinker)
+#define SRC_NODE DT_NODELABEL(uart_source)
 
 int main(void)
 {
 	const struct device *src = DEVICE_DT_GET(SRC_NODE);
-	const struct device *sink = DEVICE_DT_GET(SINK_NODE);
 	int ret;
 
-	if (!device_is_ready(src) || !device_is_ready(sink)) {
-		LOG_ERR("streaming devices not ready");
+	if (!device_is_ready(src)) {
+		LOG_ERR("source device not ready");
 		return -ENODEV;
 	}
 
-	/* Start sink first so it is ready to consume buffers. */
-	ret = zstreamer_start(sink);
-	if (ret) {
-		LOG_ERR("failed to start sink: %d", ret);
-		return ret;
-	}
-
+	/* Starting the source auto-starts all downstream children. */
 	ret = zstreamer_start(src);
 	if (ret) {
-		LOG_ERR("failed to start source: %d", ret);
+		LOG_ERR("failed to start pipeline: %d", ret);
 		return ret;
 	}
 

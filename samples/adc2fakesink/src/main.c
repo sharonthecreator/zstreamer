@@ -11,13 +11,11 @@
 
 LOG_MODULE_REGISTER(adc2fakesink, LOG_LEVEL_INF);
 
-#define ADC_SRC_NODE  DT_NODELABEL(adc_source)
-#define SINK_NODE     DT_NODELABEL(fake_sinker)
+#define ADC_SRC_NODE DT_NODELABEL(adc_source)
 
 int main(void)
 {
 	const struct device *adc_src = DEVICE_DT_GET(ADC_SRC_NODE);
-	const struct device *sink = DEVICE_DT_GET(SINK_NODE);
 	int ret;
 
 	LOG_INF("ADC to FakeSink sample");
@@ -27,21 +25,10 @@ int main(void)
 		return -ENODEV;
 	}
 
-	if (!device_is_ready(sink)) {
-		LOG_ERR("Sink device not ready");
-		return -ENODEV;
-	}
-
-	/* Start sink first so it is ready to consume buffers */
-	ret = zstreamer_start(sink);
-	if (ret) {
-		LOG_ERR("Failed to start sink: %d", ret);
-		return ret;
-	}
-
+	/* Starting the source auto-starts all downstream children. */
 	ret = zstreamer_start(adc_src);
 	if (ret) {
-		LOG_ERR("Failed to start ADC source: %d", ret);
+		LOG_ERR("Failed to start pipeline: %d", ret);
 		return ret;
 	}
 
@@ -52,7 +39,6 @@ int main(void)
 
 	LOG_INF("Stopping pipeline");
 	zstreamer_stop(adc_src);
-	zstreamer_stop(sink);
 
 	LOG_INF("Done");
 	return 0;

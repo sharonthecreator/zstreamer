@@ -123,6 +123,19 @@ int zstreamer_start(const struct device *dev)
 		return -EALREADY;
 	}
 
+	/* Start children first (depth-first) so sinks are ready before
+	 * sources begin producing data.
+	 */
+	for (size_t i = 0; i < cfg->num_children; i++) {
+		ret = zstreamer_start(cfg->children[i]);
+		if (ret != 0 && ret != -EALREADY) {
+			LOG_ERR("failed to start child %s: %d",
+				cfg->children[i]->name, ret);
+			atomic_set(&data->running, 0);
+			return ret;
+		}
+	}
+
 	if (api->open != NULL) {
 		ret = api->open(dev);
 		if (ret != 0) {
@@ -171,6 +184,16 @@ int zstreamer_stop(const struct device *dev)
 
 	if (api->close != NULL) {
 		api->close(dev);
+	}
+
+	/* Stop children after this node has stopped producing. */
+	for (size_t i = 0; i < cfg->num_children; i++) {
+		int ret = zstreamer_stop(cfg->children[i]);
+
+		if (ret != 0 && ret != -EALREADY) {
+			LOG_ERR("failed to stop child %s: %d",
+				cfg->children[i]->name, ret);
+		}
 	}
 
 	return 0;

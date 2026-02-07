@@ -37,10 +37,14 @@ struct zstreamer_graph_data {
 };
 
 /**
- * @brief Start a streaming node.
+ * @brief Start a streaming node and all its downstream children.
  *
+ * Recursively starts children (depth-first) before starting the node
+ * itself, so sinks are ready before sources begin producing data.
  * For source/sink nodes this creates the dedicated thread.
  * Calls the driver's optional open callback.
+ *
+ * Children that are already running (-EALREADY) are silently skipped.
  *
  * @param dev Node device.
  * @return 0 on success, negative errno on failure.
@@ -48,10 +52,11 @@ struct zstreamer_graph_data {
 int zstreamer_start(const struct device *dev);
 
 /**
- * @brief Stop a streaming node.
+ * @brief Stop a streaming node and all its downstream children.
  *
- * Clears the running flag, joins the thread (src/sink), drains the fifo,
- * and calls the driver's optional close callback.
+ * Stops this node first (clears running flag, joins thread, drains fifo,
+ * calls close callback), then recursively stops children.
+ * Children that are already stopped (-EALREADY) are silently skipped.
  *
  * @param dev Node device.
  * @return 0 on success, negative errno on failure.
