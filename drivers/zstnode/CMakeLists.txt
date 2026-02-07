@@ -15,6 +15,10 @@ if(CONFIG_ZSTNODE_ADC_SRC)
   add_subdirectory(adc)
 endif()
 
+if(CONFIG_ZSTNODE_FS_SINK)
+  add_subdirectory(fs)
+endif()
+
 if(CONFIG_ZSTNODE_TEST_NUMGEN_SRC OR CONFIG_ZSTNODE_TEST_FAKESINK)
   add_subdirectory(test)
 endif()

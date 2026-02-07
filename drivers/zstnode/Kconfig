@@ -20,6 +20,8 @@ rsource "spi/Kconfig"
 
 rsource "adc/Kconfig"
 
+rsource "fs/Kconfig"
+
 rsource "test/Kconfig"
 
 endif # ZSTNODE
