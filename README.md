@@ -138,21 +138,17 @@ bindings add `thread-stack-size` (default 1024) and `thread-priority`
 / {
     streaming-graph {
         compatible = "zstreamer,graph";
-        #address-cells = <1>;
-        #size-cells = <0>;
         buffer-count = <8>;
         buffer-size = <128>;
 
-        uart_source: uart-source@0 {
+        uart_source: uart-source {
             compatible = "zstreamer,zstsrc-uart";
-            reg = <0>;
             uart-device = <&usart2>;
             children = <&uart_sinker>;
         };
 
-        uart_sinker: uart-sinker@1 {
+        uart_sinker: uart-sinker {
             compatible = "zstreamer,zstsink-uart";
-            reg = <1>;
             uart-device = <&usart3>;
         };
     };
@@ -170,14 +166,11 @@ configuration.
 / {
     streaming-graph {
         compatible = "zstreamer,graph";
-        #address-cells = <1>;
-        #size-cells = <0>;
         buffer-count = <8>;
         buffer-size = <1024>;
 
-        adc_source: adc-source@0 {
+        adc_source: adc-source {
             compatible = "zstreamer,zstsrc-adc";
-            reg = <0>;
             io-channels = <&adc1 0>, <&adc1 1>;
             sample-rate-hz = <48000>;
             resolution = <12>;
@@ -187,9 +180,8 @@ configuration.
             thread-stack-size = <2048>;
         };
 
-        fs_sinker: fs-sinker@1 {
+        fs_sinker: fs-sinker {
             compatible = "zstreamer,zstsink-fs";
-            reg = <1>;
             mount-path = "/lfs/data";
             size-threshold = <65536>;
             delta-ms-threshold = <60000>;

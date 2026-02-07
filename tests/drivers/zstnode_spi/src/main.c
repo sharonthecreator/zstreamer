@@ -15,8 +15,7 @@
 #include <zephyr/device.h>
 #include <zephyr/net_buf.h>
 
-#include <zephyr/drivers/zstnode.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 #include "spi_test_peripheral.h"
 
@@ -32,13 +31,12 @@ static const struct device *sink_dev = DEVICE_DT_GET(SINK_NODE);
 static const struct device *spi_rx_dev = DEVICE_DT_GET(SPI_RX_DEV_NODE);
 static const struct device *spi_tx_dev = DEVICE_DT_GET(SPI_TX_DEV_NODE);
 
-/* Drain stale data and stop the pipeline between tests. */
+/* Drain stale data and stop the source between tests. */
 static void cleanup(void *fixture)
 {
 	ARG_UNUSED(fixture);
 
-	zstreamer_stop(src_dev);
-	zstreamer_stop(sink_dev);
+	zstnode_stop(src_dev);
 	spi_test_flush_rx(spi_rx_dev);
 	spi_test_flush_tx(spi_tx_dev);
 }
@@ -62,24 +60,26 @@ ZTEST(zstnode_spi, test_start_stop)
 {
 	int ret;
 
-	ret = zstreamer_start(sink_dev);
-	zassert_equal(ret, 0, "sink start failed: %d", ret);
+	/* Sink start/stop must return -ENOTSUP (non-source). */
+	ret = zstnode_start(sink_dev);
+	zassert_equal(ret, -ENOTSUP, "sink start: %d", ret);
 
-	ret = zstreamer_start(src_dev);
+	ret = zstnode_stop(sink_dev);
+	zassert_equal(ret, -ENOTSUP, "sink stop: %d", ret);
+
+	/* Source start/stop. */
+	ret = zstnode_start(src_dev);
 	zassert_equal(ret, 0, "src start failed: %d", ret);
 
 	/* Starting again must return -EALREADY. */
-	ret = zstreamer_start(src_dev);
+	ret = zstnode_start(src_dev);
 	zassert_equal(ret, -EALREADY, "double start: %d", ret);
 
-	ret = zstreamer_stop(src_dev);
+	ret = zstnode_stop(src_dev);
 	zassert_equal(ret, 0, "src stop failed: %d", ret);
 
-	ret = zstreamer_stop(sink_dev);
-	zassert_equal(ret, 0, "sink stop failed: %d", ret);
-
 	/* Stopping again must return -EALREADY. */
-	ret = zstreamer_stop(sink_dev);
+	ret = zstnode_stop(src_dev);
 	zassert_equal(ret, -EALREADY, "double stop: %d", ret);
 }
 
@@ -87,7 +87,7 @@ ZTEST(zstnode_spi, test_buf_alloc)
 {
 	struct net_buf *buf;
 
-	buf = zstreamer_alloc_buf(src_dev, K_MSEC(100));
+	buf = zstnode_alloc_buf(src_dev, K_MSEC(100));
 	zassert_not_null(buf, "buf alloc failed");
 	zassert_true(net_buf_tailroom(buf) > 0, "no tailroom");
 	net_buf_unref(buf);
@@ -114,10 +114,7 @@ ZTEST(zstnode_spi, test_spi_relay)
 	 */
 	spi_test_put_rx_data(spi_rx_dev, tx_data, tx_len);
 
-	ret = zstreamer_start(sink_dev);
-	zassert_equal(ret, 0, "sink start: %d", ret);
-
-	ret = zstreamer_start(src_dev);
+	ret = zstnode_start(src_dev);
 	zassert_equal(ret, 0, "src start: %d", ret);
 
 	/* Let the pipeline process data.
@@ -125,10 +122,7 @@ ZTEST(zstnode_spi, test_spi_relay)
 	 */
 	k_msleep(500);
 
-	ret = zstreamer_stop(src_dev);
-	zassert_equal(ret, 0);
-
-	ret = zstreamer_stop(sink_dev);
+	ret = zstnode_stop(src_dev);
 	zassert_equal(ret, 0);
 
 	rx_len = spi_test_get_tx_data(spi_tx_dev, rx_buf, sizeof(rx_buf));
@@ -160,17 +154,12 @@ ZTEST(zstnode_spi, test_spi_long_transfer)
 
 	spi_test_put_rx_data(spi_rx_dev, tx_data, sizeof(tx_data));
 
-	ret = zstreamer_start(sink_dev);
-	zassert_equal(ret, 0);
-
-	ret = zstreamer_start(src_dev);
+	ret = zstnode_start(src_dev);
 	zassert_equal(ret, 0);
 
 	k_msleep(2000);
 
-	ret = zstreamer_stop(src_dev);
-	zassert_equal(ret, 0);
-	ret = zstreamer_stop(sink_dev);
+	ret = zstnode_stop(src_dev);
 	zassert_equal(ret, 0);
 
 	rx_total = spi_test_get_tx_data(spi_tx_dev, rx_buf, sizeof(rx_buf));
@@ -199,16 +188,12 @@ ZTEST(zstnode_spi, test_spi_restart_cycle)
 
 		spi_test_put_rx_data(spi_rx_dev, pattern, sizeof(pattern));
 
-		ret = zstreamer_start(sink_dev);
-		zassert_equal(ret, 0, "cycle %d sink start", cycle);
-		ret = zstreamer_start(src_dev);
+		ret = zstnode_start(src_dev);
 		zassert_equal(ret, 0, "cycle %d src start", cycle);
 
 		k_msleep(300);
 
-		ret = zstreamer_stop(src_dev);
-		zassert_equal(ret, 0);
-		ret = zstreamer_stop(sink_dev);
+		ret = zstnode_stop(src_dev);
 		zassert_equal(ret, 0);
 
 		rx_len = spi_test_get_tx_data(spi_tx_dev,
@@ -239,16 +224,12 @@ ZTEST(zstnode_spi, test_spi_stress)
 
 	spi_test_put_rx_data(spi_rx_dev, tx_data, sizeof(tx_data));
 
-	ret = zstreamer_start(sink_dev);
-	zassert_equal(ret, 0);
-	ret = zstreamer_start(src_dev);
+	ret = zstnode_start(src_dev);
 	zassert_equal(ret, 0);
 
 	k_msleep(3000);
 
-	ret = zstreamer_stop(src_dev);
-	zassert_equal(ret, 0);
-	ret = zstreamer_stop(sink_dev);
+	ret = zstnode_stop(src_dev);
 	zassert_equal(ret, 0);
 
 	rx_total = spi_test_get_tx_data(spi_tx_dev, rx_buf, sizeof(rx_buf));
@@ -285,16 +266,12 @@ ZTEST(zstnode_spi, test_spi_large_verified)
 
 	spi_test_put_rx_data(spi_rx_dev, tx_data, sizeof(tx_data));
 
-	ret = zstreamer_start(sink_dev);
-	zassert_equal(ret, 0);
-	ret = zstreamer_start(src_dev);
+	ret = zstnode_start(src_dev);
 	zassert_equal(ret, 0);
 
 	k_msleep(5000);
 
-	ret = zstreamer_stop(src_dev);
-	zassert_equal(ret, 0);
-	ret = zstreamer_stop(sink_dev);
+	ret = zstnode_stop(src_dev);
 	zassert_equal(ret, 0);
 
 	rx_total = spi_test_get_tx_data(spi_tx_dev, rx_data, sizeof(rx_data));

@@ -26,14 +26,11 @@
 
 	spi_streaming_graph: spi-streaming-graph {
 		compatible = "zstreamer,graph";
-		#address-cells = <1>;
-		#size-cells = <0>;
 		buffer-count = <8>;
 		buffer-size = <1024>;
 
-		spi_source: spi-source@0 {
+		spi_source: spi-source {
 			compatible = "zstreamer,zstsrc-spi";
-			reg = <0>;
 			spi-device = <&spi_test_rx>;
 			children = <&spi_sinker>;
 			rx-length = <64>;
@@ -41,9 +38,8 @@
 			thread-priority = <5>;
 		};
 
-		spi_sinker: spi-sinker@1 {
+		spi_sinker: spi-sinker {
 			compatible = "zstreamer,zstsink-spi";
-			reg = <1>;
 			spi-device = <&spi_test_tx>;
 			thread-stack-size = <1024>;
 			thread-priority = <5>;

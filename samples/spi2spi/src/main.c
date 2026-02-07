@@ -7,7 +7,7 @@
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
 
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 LOG_MODULE_REGISTER(spi2spi, LOG_LEVEL_INF);
 
@@ -23,8 +23,7 @@ int main(void)
 		return -ENODEV;
 	}
 
-	/* Starting the source auto-starts all downstream children. */
-	ret = zstreamer_start(src);
+	ret = zstnode_start(src);
 	if (ret) {
 		LOG_ERR("failed to start pipeline: %d", ret);
 		return ret;

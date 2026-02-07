@@ -9,8 +9,7 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/logging/log.h>
 
-#include <zephyr/drivers/zstnode.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 #if defined(CONFIG_UART_ASYNC_API)
 #include "uart_dma_context.h"
@@ -175,7 +174,6 @@ static int zstsink_uart_init(const struct device *dev)
 	static const struct zstsink_uart_config zstsink_uart_config_##inst = { \
 		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
 			DT_DRV_INST(inst),                                     \
-			ZSTNODE_TYPE_SINK,                                     \
 			DT_INST_PROP(inst, thread_stack_size),                 \
 			DT_INST_PROP(inst, thread_priority)),                  \
 		.uart_dev = DEVICE_DT_GET(                                     \

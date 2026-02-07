@@ -7,7 +7,7 @@
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
 
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 LOG_MODULE_REGISTER(adc2fakesink, LOG_LEVEL_INF);
 
@@ -25,8 +25,7 @@ int main(void)
 		return -ENODEV;
 	}
 
-	/* Starting the source auto-starts all downstream children. */
-	ret = zstreamer_start(adc_src);
+	ret = zstnode_start(adc_src);
 	if (ret) {
 		LOG_ERR("Failed to start pipeline: %d", ret);
 		return ret;
@@ -38,7 +37,7 @@ int main(void)
 	k_sleep(K_SECONDS(10));
 
 	LOG_INF("Stopping pipeline");
-	zstreamer_stop(adc_src);
+	zstnode_stop(adc_src);
 
 	LOG_INF("Done");
 	return 0;

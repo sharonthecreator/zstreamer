@@ -9,8 +9,7 @@
 #include <zephyr/drivers/spi.h>
 #include <zephyr/logging/log.h>
 
-#include <zephyr/drivers/zstnode.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 LOG_MODULE_REGISTER(zstsink_spi, CONFIG_ZSTNODE_LOG_LEVEL);
 
@@ -193,7 +192,6 @@ static int zstsink_spi_init(const struct device *dev)
 	static const struct zstsink_spi_config zstsink_spi_config_##inst = {   \
 		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
 			DT_DRV_INST(inst),                                     \
-			ZSTNODE_TYPE_SINK,                                     \
 			DT_INST_PROP(inst, thread_stack_size),                 \
 			DT_INST_PROP(inst, thread_priority)),                  \
 		.spi = SPI_DT_SPEC_GET(SPI_DEV_NODE(inst),                    \

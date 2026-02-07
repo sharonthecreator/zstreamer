@@ -38,23 +38,19 @@
 / {
 	streaming_graph: streaming-graph {
 		compatible = "zstreamer,graph";
-		#address-cells = <1>;
-		#size-cells = <0>;
 		buffer-count = <8>;
 		buffer-size = <128>;
 
-		spi_source: spi-source@0 {
+		spi_source: spi-source {
 			compatible = "zstreamer,zstsrc-spi";
-			reg = <0>;
 			spi-device = <&spi1>;
 			spi-max-frequency = <1000000>;
 			rx-length = <64>;
 			children = <&spi_sinker>;
 		};
 
-		spi_sinker: spi-sinker@1 {
+		spi_sinker: spi-sinker {
 			compatible = "zstreamer,zstsink-spi";
-			reg = <1>;
 			spi-device = <&spi3>;
 			spi-max-frequency = <1000000>;
 		};

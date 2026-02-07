@@ -8,8 +8,7 @@
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
 
-#include <zephyr/drivers/zstnode.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 LOG_MODULE_REGISTER(zstsink_fake, CONFIG_ZSTNODE_LOG_LEVEL);
 
@@ -45,7 +44,6 @@ static const struct zstnode_driver_api zstsink_fake_api = {
 	static const struct zstsink_fake_config zstsink_fake_config_##inst = { \
 		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
 			DT_DRV_INST(inst),                                     \
-			ZSTNODE_TYPE_SINK,                                     \
 			DT_INST_PROP(inst, thread_stack_size),                 \
 			DT_INST_PROP(inst, thread_priority)),                  \
 	};                                                                     \
