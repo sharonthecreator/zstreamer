@@ -15,8 +15,7 @@
 #include <zephyr/drivers/adc.h>
 #include <zephyr/logging/log.h>
 
-#include <zephyr/drivers/zstnode.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 #if defined(CONFIG_ZSTNODE_ADC_STM32)
 #include "zstsrc_adc_stm32.h"
@@ -199,34 +198,26 @@ static int zstsrc_adc_close(const struct device *dev)
 }
 
 /**
- * Run function - called by streaming thread.
+ * Process function - called by streaming thread with a pre-allocated buffer.
  *
  * This waits for the DMA callback to signal buffer ready, then copies
- * the data to a streaming buffer and submits it.
+ * the data into the provided streaming buffer.
  */
-static int zstsrc_adc_run(const struct device *dev)
+static int zstsrc_adc_process(const struct device *dev, struct net_buf *buf)
 {
 	const struct zstsrc_adc_config *cfg = dev->config;
 	struct zstsrc_adc_data *data = dev->data;
-	struct net_buf *buf;
 	int ret;
 
 	/* Wait for buffer ready signal from DMA callback */
 	ret = k_sem_take(&data->buffer_ready, K_MSEC(100));
 	if (ret == -EAGAIN) {
 		/* Timeout - no data ready yet */
-		return 0;
+		return -EAGAIN;
 	}
 
 	if (data->ready_buffer == NULL || data->ready_samples == 0) {
-		return 0;
-	}
-
-	/* Allocate streaming buffer */
-	buf = zstreamer_alloc_buf(dev, K_MSEC(10));
-	if (buf == NULL) {
-		LOG_WRN("Failed to allocate buffer, dropping samples");
-		return 0;
+		return -EAGAIN;
 	}
 
 	/* Calculate data size */
@@ -243,8 +234,7 @@ static int zstsrc_adc_run(const struct device *dev)
 	/* Copy data to streaming buffer */
 	net_buf_add_mem(buf, data->ready_buffer, data_size);
 
-	/* Submit to downstream nodes */
-	return zstreamer_submit_buffer(dev, buf);
+	return 0;
 }
 
 /*
@@ -256,7 +246,7 @@ static int zstsrc_adc_run(const struct device *dev)
 static const struct zstnode_driver_api zstsrc_adc_api = {
 	.open = zstsrc_adc_open,
 	.close = zstsrc_adc_close,
-	.run = zstsrc_adc_run,
+	.generate = zstsrc_adc_process,
 };
 
 /*
@@ -288,7 +278,6 @@ static const struct zstnode_driver_api zstsrc_adc_api = {
 	static const struct zstsrc_adc_config zstsrc_adc_config_##inst = {     \
 		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
 			DT_DRV_INST(inst),                                     \
-			ZSTNODE_TYPE_SOURCE,                                   \
 			DT_INST_PROP(inst, thread_stack_size),                 \
 			DT_INST_PROP(inst, thread_priority)),                  \
 		.adc_dev = ADC_DEV_GET(DT_DRV_INST(inst)),                     \

@@ -8,8 +8,7 @@
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
 
-#include <zephyr/drivers/zstnode.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 LOG_MODULE_REGISTER(zstsrc_numgen, CONFIG_ZSTNODE_LOG_LEVEL);
 
@@ -22,25 +21,20 @@ struct zstsrc_numgen_data {
 	uint8_t counter;
 };
 
-static int zstsrc_numgen_run(const struct device *dev)
+static int zstsrc_numgen_process(const struct device *dev,
+				 struct net_buf *buf)
 {
 	struct zstsrc_numgen_data *data = dev->data;
-	struct net_buf *buf;
-
-	buf = zstreamer_alloc_buf(dev, K_MSEC(100));
-	if (buf == NULL) {
-		return 0;
-	}
 
 	while (net_buf_tailroom(buf) > 0) {
 		net_buf_add_u8(buf, data->counter++);
 	}
 
-	return zstreamer_submit_buffer(dev, buf);
+	return 0;
 }
 
 static const struct zstnode_driver_api zstsrc_numgen_api = {
-	.run = zstsrc_numgen_run,
+	.generate = zstsrc_numgen_process,
 };
 
 #define ZSTSRC_NUMGEN_DEFINE(inst)                                             \
@@ -54,7 +48,6 @@ static const struct zstnode_driver_api zstsrc_numgen_api = {
 	static const struct zstsrc_numgen_config zstsrc_numgen_config_##inst = {\
 		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
 			DT_DRV_INST(inst),                                     \
-			ZSTNODE_TYPE_SOURCE,                                   \
 			DT_INST_PROP(inst, thread_stack_size),                 \
 			DT_INST_PROP(inst, thread_priority)),                  \
 	};                                                                     \

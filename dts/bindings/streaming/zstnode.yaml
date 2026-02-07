@@ -15,3 +15,13 @@ properties:
     description: |
       Downstream node(s) that this node sends buffers to.
       For fan-out, list multiple phandles.
+
+  thread-stack-size:
+    type: int
+    default: 1024
+    description: Stack size in bytes for the node thread.
+
+  thread-priority:
+    type: int
+    default: 5
+    description: Priority of the node thread.

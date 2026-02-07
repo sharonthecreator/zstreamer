@@ -8,8 +8,8 @@
  * @brief Public API for zstnode drivers
  */
 
-#ifndef ZEPHYR_INCLUDE_DRIVERS_ZSTNODE_H_
-#define ZEPHYR_INCLUDE_DRIVERS_ZSTNODE_H_
+#ifndef ZSTREAMER_ZSTNODE_H_
+#define ZSTREAMER_ZSTNODE_H_
 
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
@@ -27,13 +27,6 @@ extern "C" {
  * @{
  */
 
-/** Node type enumeration. */
-enum zstnode_type {
-	ZSTNODE_TYPE_SOURCE,
-	ZSTNODE_TYPE_SINK,
-	ZSTNODE_TYPE_GENERIC,
-};
-
 /**
  * @brief Common configuration shared by all zstnode devices.
  *
@@ -44,7 +37,6 @@ struct zstnode_common_config {
 	const struct device *graph;
 	const struct device * const *children;
 	size_t num_children;
-	enum zstnode_type type;
 	size_t thread_stack_size;
 	int thread_priority;
 };
@@ -58,59 +50,81 @@ struct zstnode_common_config {
 struct zstnode_common_data {
 	const struct device *dev;
 	struct k_fifo fifo;
-	struct k_work work;
 	struct k_thread thread;
 	k_thread_stack_t *stack;
 	atomic_t running;
+	struct k_sem run_sem;
+	struct k_sem idle_sem;
 };
 
 /**
  * @brief zstnode driver API structure.
  *
- * @param open    Optional. Called to set up hardware before streaming begins.
- * @param close   Optional. Called to tear down hardware after streaming ends.
- * @param run     Source nodes only. Called in a loop from the source thread.
- *                Return 0 to continue, non-zero to stop.
- * @param process Sink/generic nodes. Called for each received buffer.
- *                Return 0 on success, non-zero on error.
+ * Source nodes implement generate(); non-source nodes implement process().
+ * The framework thread handles buffer allocation and distribution.
+ *
+ * @param open      Optional. Called to set up hardware. For non-source nodes
+ *                  this is called at boot. For source nodes it is called by
+ *                  zstnode_start().
+ * @param close     Optional. Called to tear down hardware. For source nodes
+ *                  it is called by zstnode_stop().
+ * @param generate  Source nodes only. Called with a pre-allocated buffer;
+ *                  the driver fills it with data. Return 0 on success;
+ *                  non-zero causes the buffer to be dropped.
+ * @param process   Non-source nodes. Called for each received buffer.
+ *                  Return 0 on success; non-zero causes the buffer to be
+ *                  dropped.
  */
 __subsystem struct zstnode_driver_api {
 	int (*open)(const struct device *dev);
 	int (*close)(const struct device *dev);
-	int (*run)(const struct device *dev);
+	int (*generate)(const struct device *dev, struct net_buf *buf);
 	int (*process)(const struct device *dev, struct net_buf *buf);
 };
 
 /**
- * @brief Work handler for generic (workqueue-based) nodes.
+ * @brief Start a source node.
  *
- * Defined in zstreamer_node.c. Drains the node fifo, calling
- * api->process for each buffer.
+ * Sets the running flag, calls the driver's open callback, and signals
+ * the source thread to begin processing. Only valid for source nodes.
+ *
+ * @param dev Node device.
+ * @return 0 on success, -EALREADY if already running, -ENOTSUP if
+ *         not a source, or negative errno on failure.
  */
-extern void zstnode_generic_work_handler(struct k_work *work);
+int zstnode_start(const struct device *dev);
+
+/**
+ * @brief Stop a source node.
+ *
+ * Clears the running flag, waits for the source thread to become idle,
+ * drains pending buffers, and calls the driver's close callback.
+ * Only valid for source nodes.
+ *
+ * @param dev Node device.
+ * @return 0 on success, -EALREADY if already stopped, -ENOTSUP if
+ *         not a source, or negative errno on failure.
+ */
+int zstnode_stop(const struct device *dev);
+
+/**
+ * @brief Allocate a buffer from the node's graph pool.
+ *
+ * @param dev     Node device.
+ * @param timeout Allocation timeout.
+ * @return Pointer to allocated net_buf, or NULL on timeout.
+ */
+struct net_buf *zstnode_alloc_buf(const struct device *dev,
+				  k_timeout_t timeout);
 
 /** @cond INTERNAL_HIDDEN */
 
 /**
  * Common init function called from the device init wrapper.
- * Sets the dev back-pointer, initializes the fifo, and for generic
- * nodes initializes the k_work.
+ * Sets the dev back-pointer, initializes the fifo and semaphores,
+ * calls open() for non-source nodes, and creates the thread.
  */
-static inline int zstnode_common_init(const struct device *dev)
-{
-	struct zstnode_common_data *data = (struct zstnode_common_data *)dev->data;
-	const struct zstnode_common_config *cfg =
-		(const struct zstnode_common_config *)dev->config;
-
-	data->dev = dev;
-	k_fifo_init(&data->fifo);
-
-	if (cfg->type == ZSTNODE_TYPE_GENERIC) {
-		k_work_init(&data->work, zstnode_generic_work_handler);
-	}
-
-	return 0;
-}
+extern int zstnode_common_init(const struct device *dev);
 
 /*
  * Helper: generate children array from DT phandles.
@@ -135,12 +149,11 @@ static inline int zstnode_common_init(const struct device *dev)
 /*
  * Common config initializer.
  */
-#define Z_ZSTNODE_COMMON_CONFIG_INIT(inst, node_id, _type, _stack_size, _prio) \
+#define Z_ZSTNODE_COMMON_CONFIG_INIT(inst, node_id, _stack_size, _prio)        \
 	{                                                                      \
 		.graph = DEVICE_DT_GET(DT_PARENT(node_id)),                    \
 		.children = zstnode_children_##inst,                            \
 		.num_children = Z_ZSTNODE_NUM_CHILDREN(node_id),               \
-		.type = _type,                                                 \
 		.thread_stack_size = _stack_size,                               \
 		.thread_priority = _prio,                                      \
 	}
@@ -172,7 +185,10 @@ static inline int zstnode_common_init(const struct device *dev)
 /** @endcond */
 
 /**
- * @brief Define a source node device from a devicetree node identifier.
+ * @brief Define a zstnode device from a devicetree node identifier.
+ *
+ * All nodes (source, sink, or generic) use this single macro.
+ * A dedicated thread stack is always allocated.
  *
  * @param inst       Unique instance number (used for symbol naming).
  * @param node_id    Devicetree node identifier.
@@ -181,67 +197,18 @@ static inline int zstnode_common_init(const struct device *dev)
  * @param cfg_ptr    Pointer to driver-specific config struct.
  * @param api_ptr    Pointer to zstnode_driver_api struct.
  */
-#define ZSTNODE_SRC_DT_DEFINE(inst, node_id, init_fn, data_ptr, cfg_ptr,       \
-			      api_ptr)                                         \
-	Z_ZSTNODE_CHILDREN_DEFINE(inst, node_id);                              \
-	static K_THREAD_STACK_DEFINE(                                          \
-		zstnode_stack_##inst,                                           \
-		DT_PROP(node_id, thread_stack_size));                          \
-	Z_ZSTNODE_INIT_WRAPPER_DEFINE(inst, init_fn)                           \
-	DEVICE_DT_DEFINE(node_id, zstnode_init_##inst, NULL,                   \
-			 data_ptr, cfg_ptr, POST_KERNEL,                       \
-			 CONFIG_KERNEL_INIT_PRIORITY_DEVICE, api_ptr)
-
-/**
- * @brief Define a sink node device from a devicetree node identifier.
- *
- * Same as ZSTNODE_SRC_DT_DEFINE but for sink nodes.
- */
-#define ZSTNODE_SINK_DT_DEFINE(inst, node_id, init_fn, data_ptr, cfg_ptr,      \
-			       api_ptr)                                        \
-	Z_ZSTNODE_CHILDREN_DEFINE(inst, node_id);                              \
-	static K_THREAD_STACK_DEFINE(                                          \
-		zstnode_stack_##inst,                                           \
-		DT_PROP(node_id, thread_stack_size));                          \
-	Z_ZSTNODE_INIT_WRAPPER_DEFINE(inst, init_fn)                           \
-	DEVICE_DT_DEFINE(node_id, zstnode_init_##inst, NULL,                   \
-			 data_ptr, cfg_ptr, POST_KERNEL,                       \
-			 CONFIG_KERNEL_INIT_PRIORITY_DEVICE, api_ptr)
-
-/**
- * @brief Define a generic (workqueue-based) node device from a devicetree
- *        node identifier.
- *
- * Generic nodes have no dedicated thread; they process buffers on the
- * system workqueue.
- */
 #define ZSTNODE_DT_DEFINE(inst, node_id, init_fn, data_ptr, cfg_ptr, api_ptr)  \
 	Z_ZSTNODE_CHILDREN_DEFINE(inst, node_id);                              \
+	static K_THREAD_STACK_DEFINE(                                          \
+		zstnode_stack_##inst,                                           \
+		DT_PROP(node_id, thread_stack_size));                          \
 	Z_ZSTNODE_INIT_WRAPPER_DEFINE(inst, init_fn)                           \
 	DEVICE_DT_DEFINE(node_id, zstnode_init_##inst, NULL,                   \
 			 data_ptr, cfg_ptr, POST_KERNEL,                       \
 			 CONFIG_KERNEL_INIT_PRIORITY_DEVICE, api_ptr)
 
-/*
- * DT_INST variants for use inside DT_INST_FOREACH_STATUS_OKAY.
- */
-
 /**
- * @brief Instance-based source node definition macro.
- */
-#define ZSTNODE_SRC_DT_INST_DEFINE(inst, init_fn, data_ptr, cfg_ptr, api_ptr)  \
-	ZSTNODE_SRC_DT_DEFINE(inst, DT_DRV_INST(inst), init_fn,               \
-			      data_ptr, cfg_ptr, api_ptr)
-
-/**
- * @brief Instance-based sink node definition macro.
- */
-#define ZSTNODE_SINK_DT_INST_DEFINE(inst, init_fn, data_ptr, cfg_ptr, api_ptr) \
-	ZSTNODE_SINK_DT_DEFINE(inst, DT_DRV_INST(inst), init_fn,              \
-			       data_ptr, cfg_ptr, api_ptr)
-
-/**
- * @brief Instance-based generic node definition macro.
+ * @brief Instance-based node definition macro.
  */
 #define ZSTNODE_DT_INST_DEFINE(inst, init_fn, data_ptr, cfg_ptr, api_ptr)      \
 	ZSTNODE_DT_DEFINE(inst, DT_DRV_INST(inst), init_fn,                   \
@@ -255,4 +222,4 @@ static inline int zstnode_common_init(const struct device *dev)
 }
 #endif
 
-#endif /* ZEPHYR_INCLUDE_DRIVERS_ZSTNODE_H_ */
+#endif /* ZSTREAMER_ZSTNODE_H_ */

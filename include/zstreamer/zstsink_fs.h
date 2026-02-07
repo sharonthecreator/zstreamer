@@ -8,8 +8,8 @@
  * @brief Public API for the file system sink zstnode driver
  */
 
-#ifndef ZEPHYR_INCLUDE_DRIVERS_ZSTSINK_FS_H_
-#define ZEPHYR_INCLUDE_DRIVERS_ZSTSINK_FS_H_
+#ifndef ZSTREAMER_ZSTSINK_FS_H_
+#define ZSTREAMER_ZSTSINK_FS_H_
 
 #include <zephyr/device.h>
 #include <stddef.h>
@@ -50,4 +50,4 @@ int zstsink_fs_set_filename_handler(const struct device *dev,
 }
 #endif
 
-#endif /* ZEPHYR_INCLUDE_DRIVERS_ZSTSINK_FS_H_ */
+#endif /* ZSTREAMER_ZSTSINK_FS_H_ */

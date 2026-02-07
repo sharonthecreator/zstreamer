@@ -9,20 +9,16 @@
 / {
 	streaming_graph: streaming-graph {
 		compatible = "zstreamer,graph";
-		#address-cells = <1>;
-		#size-cells = <0>;
 		buffer-count = <8>;
 		buffer-size = <128>;
 
-		numgen_source: numgen-source@0 {
+		numgen_source: numgen-source {
 			compatible = "zstreamer,zstsrc-numgen";
-			reg = <0>;
 			children = <&fake_sinker>;
 		};
 
-		fake_sinker: fake-sinker@1 {
+		fake_sinker: fake-sinker {
 			compatible = "zstreamer,zstsink-fake";
-			reg = <1>;
 		};
 	};
 };

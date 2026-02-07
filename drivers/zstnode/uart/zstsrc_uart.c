@@ -9,8 +9,7 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/logging/log.h>
 
-#include <zephyr/drivers/zstnode.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 #if defined(CONFIG_UART_ASYNC_API)
 #include "uart_dma_context.h"
@@ -92,44 +91,34 @@ static int zstsrc_uart_close_dma(const struct device *dev)
 	return 0;
 }
 
-static int zstsrc_uart_run_dma(const struct device *dev)
+static int zstsrc_uart_process_dma(const struct device *dev,
+				   struct net_buf *buf)
 {
 	struct zstsrc_uart_data *data = dev->data;
-	struct net_buf *buf;
 
 	/* Wait for RX data with timeout. */
 	if (k_sem_take(&data->rx_sem, K_MSEC(100)) != 0) {
-		return 0;
+		return -EAGAIN;
 	}
 
 	if (data->rx_len == 0) {
-		return 0;
-	}
-
-	buf = zstreamer_alloc_buf(dev, K_MSEC(100));
-	if (buf == NULL) {
-		LOG_WRN("Buffer alloc failed, data lost");
-		return 0;
+		return -EAGAIN;
 	}
 
 	size_t copy_len = MIN(data->rx_len, net_buf_tailroom(buf));
+
 	net_buf_add_mem(buf, data->rx_data, copy_len);
 
-	return zstreamer_submit_buffer(dev, buf);
+	return 0;
 }
 
 #endif /* CONFIG_UART_ASYNC_API */
 
-static int zstsrc_uart_run_poll(const struct device *dev)
+static int zstsrc_uart_process_poll(const struct device *dev,
+				    struct net_buf *buf)
 {
 	const struct zstsrc_uart_config *cfg = dev->config;
-	struct net_buf *buf;
 	unsigned char c;
-
-	buf = zstreamer_alloc_buf(dev, K_MSEC(100));
-	if (buf == NULL) {
-		return 0;
-	}
 
 	while (net_buf_tailroom(buf) > 0) {
 		if (uart_poll_in(cfg->uart_dev, &c) < 0) {
@@ -138,25 +127,25 @@ static int zstsrc_uart_run_poll(const struct device *dev)
 		net_buf_add_u8(buf, c);
 	}
 
-	if (buf->len > 0) {
-		return zstreamer_submit_buffer(dev, buf);
+	if (buf->len == 0) {
+		k_msleep(1);
+		return -EAGAIN;
 	}
 
-	net_buf_unref(buf);
-	k_msleep(1);
 	return 0;
 }
 
-static int zstsrc_uart_run(const struct device *dev)
+static int zstsrc_uart_process(const struct device *dev,
+			       struct net_buf *buf)
 {
 #if defined(CONFIG_UART_ASYNC_API)
 	struct zstsrc_uart_data *data = dev->data;
 
 	if (data->dma_enabled) {
-		return zstsrc_uart_run_dma(dev);
+		return zstsrc_uart_process_dma(dev, buf);
 	}
 #endif
-	return zstsrc_uart_run_poll(dev);
+	return zstsrc_uart_process_poll(dev, buf);
 }
 
 #if defined(CONFIG_UART_ASYNC_API)
@@ -185,7 +174,7 @@ static const struct zstnode_driver_api zstsrc_uart_api = {
 	.open = zstsrc_uart_open,
 	.close = zstsrc_uart_close,
 #endif
-	.run = zstsrc_uart_run,
+	.generate = zstsrc_uart_process,
 };
 
 #if defined(CONFIG_UART_ASYNC_API)
@@ -212,7 +201,6 @@ static int zstsrc_uart_init(const struct device *dev)
 	static const struct zstsrc_uart_config zstsrc_uart_config_##inst = {   \
 		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
 			DT_DRV_INST(inst),                                     \
-			ZSTNODE_TYPE_SOURCE,                                   \
 			DT_INST_PROP(inst, thread_stack_size),                 \
 			DT_INST_PROP(inst, thread_priority)),                  \
 		.uart_dev = DEVICE_DT_GET(                                     \

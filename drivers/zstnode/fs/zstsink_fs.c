@@ -12,9 +12,8 @@
 #include <zephyr/net_buf.h>
 #include <stdio.h>
 
-#include <zephyr/drivers/zstnode.h>
-#include <zephyr/drivers/zstsink_fs.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
+#include <zstreamer/zstsink_fs.h>
 
 LOG_MODULE_REGISTER(zstsink_fs, CONFIG_ZSTNODE_LOG_LEVEL);
 
@@ -199,7 +198,6 @@ int zstsink_fs_set_filename_handler(const struct device *dev,
 	static const struct zstsink_fs_config zstsink_fs_config_##inst = {     \
 		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
 			DT_DRV_INST(inst),                                     \
-			ZSTNODE_TYPE_SINK,                                     \
 			DT_INST_PROP(inst, thread_stack_size),                 \
 			DT_INST_PROP(inst, thread_priority)),                  \
 		.mount_path = DT_INST_PROP(inst, mount_path),                  \

@@ -6,4 +6,5 @@ tests:
     tags: drivers zstnode zstreamer uart
     platform_allow:
       - native_sim
+      - native_sim/native/64
       - qemu_cortex_m3

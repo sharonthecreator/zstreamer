@@ -55,14 +55,11 @@
 / {
 	streaming_graph: streaming-graph {
 		compatible = "zstreamer,graph";
-		#address-cells = <1>;
-		#size-cells = <0>;
 		buffer-count = <8>;
 		buffer-size = <1024>;
 
-		adc_source: adc-source@0 {
+		adc_source: adc-source {
 			compatible = "zstreamer,zstsrc-adc";
-			reg = <0>;
 			io-channels = <&adc1 0>, <&adc1 1>;
 			sample-rate-hz = <48000>;
 			resolution = <12>;
@@ -74,9 +71,8 @@
 			thread-priority = <5>;
 		};
 
-		fake_sinker: fake-sinker@1 {
+		fake_sinker: fake-sinker {
 			compatible = "zstreamer,zstsink-fake";
-			reg = <1>;
 			thread-stack-size = <1024>;
 			thread-priority = <5>;
 		};

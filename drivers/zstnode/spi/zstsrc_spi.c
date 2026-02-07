@@ -9,8 +9,7 @@
 #include <zephyr/drivers/spi.h>
 #include <zephyr/logging/log.h>
 
-#include <zephyr/drivers/zstnode.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/zstnode.h>
 
 LOG_MODULE_REGISTER(zstsrc_spi, CONFIG_ZSTNODE_LOG_LEVEL);
 
@@ -36,13 +35,13 @@ struct zstsrc_spi_data {
 
 #if defined(CONFIG_SPI_ASYNC)
 
-static int zstsrc_spi_run_async(const struct device *dev)
+static int zstsrc_spi_process_async(const struct device *dev,
+				    struct net_buf *buf)
 {
 	const struct zstsrc_spi_config *cfg = dev->config;
 	struct zstsrc_spi_data *data = dev->data;
-	struct net_buf *buf;
-	size_t rx_len;
 	int ret, result;
+	size_t rx_len;
 
 	rx_len = MIN(cfg->rx_length, sizeof(data->dma_rx_buf));
 
@@ -62,32 +61,26 @@ static int zstsrc_spi_run_async(const struct device *dev)
 			      &rx_bufs, &data->sig);
 	if (ret < 0) {
 		LOG_ERR("SPI async read failed: %d", ret);
-		return 0;
+		return ret;
 	}
 
 	ret = k_poll(&data->evt, 1, K_MSEC(1000));
 	if (ret < 0) {
 		LOG_WRN("SPI RX poll timeout");
-		return 0;
+		return -EAGAIN;
 	}
 
 	result = data->sig.result;
 	if (result < 0) {
 		LOG_ERR("SPI RX error: %d", result);
-		return 0;
-	}
-
-	buf = zstreamer_alloc_buf(dev, K_MSEC(100));
-	if (buf == NULL) {
-		LOG_WRN("Buffer alloc failed, data lost");
-		return 0;
+		return result;
 	}
 
 	size_t copy_len = MIN(rx_len, net_buf_tailroom(buf));
 
 	net_buf_add_mem(buf, data->dma_rx_buf, copy_len);
 
-	return zstreamer_submit_buffer(dev, buf);
+	return 0;
 }
 
 static int zstsrc_spi_open_async(const struct device *dev)
@@ -123,16 +116,11 @@ static int zstsrc_spi_open_async(const struct device *dev)
 
 #endif /* CONFIG_SPI_ASYNC */
 
-static int zstsrc_spi_run_poll(const struct device *dev)
+static int zstsrc_spi_process_poll(const struct device *dev,
+				   struct net_buf *buf)
 {
 	const struct zstsrc_spi_config *cfg = dev->config;
-	struct net_buf *buf;
 	int ret;
-
-	buf = zstreamer_alloc_buf(dev, K_MSEC(100));
-	if (buf == NULL) {
-		return 0;
-	}
 
 	size_t rx_len = MIN(cfg->rx_length, net_buf_tailroom(buf));
 
@@ -148,14 +136,11 @@ static int zstsrc_spi_run_poll(const struct device *dev)
 	ret = spi_read_dt(&cfg->spi, &rx_bufs);
 	if (ret < 0) {
 		LOG_ERR("SPI read failed: %d", ret);
-		net_buf_unref(buf);
 		k_msleep(1);
-		return 0;
+		return ret;
 	}
 
 	net_buf_add(buf, rx_len);
-
-	ret = zstreamer_submit_buffer(dev, buf);
 
 	/* On real hardware the SPI transaction itself takes time; on
 	 * emulators it completes instantly.  Sleep briefly to avoid
@@ -163,19 +148,20 @@ static int zstsrc_spi_run_poll(const struct device *dev)
 	 */
 	k_msleep(1);
 
-	return ret;
+	return 0;
 }
 
-static int zstsrc_spi_run(const struct device *dev)
+static int zstsrc_spi_process(const struct device *dev,
+			      struct net_buf *buf)
 {
 #if defined(CONFIG_SPI_ASYNC)
 	struct zstsrc_spi_data *data = dev->data;
 
 	if (data->async_enabled) {
-		return zstsrc_spi_run_async(dev);
+		return zstsrc_spi_process_async(dev, buf);
 	}
 #endif
-	return zstsrc_spi_run_poll(dev);
+	return zstsrc_spi_process_poll(dev, buf);
 }
 
 static int zstsrc_spi_open(const struct device *dev)
@@ -199,7 +185,7 @@ static int zstsrc_spi_close(const struct device *dev)
 static const struct zstnode_driver_api zstsrc_spi_api = {
 	.open = zstsrc_spi_open,
 	.close = zstsrc_spi_close,
-	.run = zstsrc_spi_run,
+	.generate = zstsrc_spi_process,
 };
 
 #if defined(CONFIG_SPI_ASYNC)
@@ -230,7 +216,6 @@ static int zstsrc_spi_init(const struct device *dev)
 	static const struct zstsrc_spi_config zstsrc_spi_config_##inst = {     \
 		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
 			DT_DRV_INST(inst),                                     \
-			ZSTNODE_TYPE_SOURCE,                                   \
 			DT_INST_PROP(inst, thread_stack_size),                 \
 			DT_INST_PROP(inst, thread_priority)),                  \
 		.spi = SPI_DT_SPEC_GET(SPI_DEV_NODE(inst),                    \

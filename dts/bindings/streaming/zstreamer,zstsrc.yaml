@@ -8,14 +8,3 @@ description: |
 compatible: "zstreamer,zstsrc"
 
 include: zstnode.yaml
-
-properties:
-  thread-stack-size:
-    type: int
-    default: 1024
-    description: Stack size in bytes for the source thread.
-
-  thread-priority:
-    type: int
-    default: 5
-    description: Priority of the source thread.
