@@ -18,6 +18,10 @@ struct uart_dma_context {
 	/* RX side */
 	uart_dma_rx_handler_t rx_handler;
 	void *rx_user_data;
+	uint8_t *rx_buf;
+	size_t rx_buf_len;
+	int32_t rx_timeout;
+	bool rx_disabling;
 
 	/* TX side */
 	uart_dma_tx_handler_t tx_handler;
@@ -94,12 +98,23 @@ static void uart_dma_callback(const struct device *uart_dev,
 		/* Buffer is no longer in use by the driver. */
 		break;
 
-	case UART_RX_DISABLED:
-		LOG_DBG("UART RX disabled");
-		break;
-
 	case UART_RX_STOPPED:
 		LOG_WRN("UART RX stopped due to error");
+		break;
+
+	case UART_RX_DISABLED:
+		if (!ctx->rx_disabling && ctx->rx_handler != NULL) {
+			LOG_WRN("UART RX disabled unexpectedly, restarting");
+			int err = uart_rx_enable(ctx->uart_dev, ctx->rx_buf,
+						 ctx->rx_buf_len,
+						 ctx->rx_timeout);
+			if (err != 0) {
+				LOG_ERR("Failed to restart RX: %d", err);
+			}
+		} else {
+			ctx->rx_disabling = false;
+			LOG_DBG("UART RX disabled");
+		}
 		break;
 
 	case UART_TX_DONE:
@@ -228,11 +243,32 @@ void uart_dma_context_unregister_tx(const struct device *uart_dev)
 int uart_dma_context_rx_enable(const struct device *uart_dev, uint8_t *buf,
 			       size_t len, int32_t timeout)
 {
+	k_spinlock_key_t key = k_spin_lock(&lock);
+	struct uart_dma_context *ctx = find_context(uart_dev);
+
+	if (ctx != NULL) {
+		ctx->rx_buf = buf;
+		ctx->rx_buf_len = len;
+		ctx->rx_timeout = timeout;
+		ctx->rx_disabling = false;
+	}
+
+	k_spin_unlock(&lock, key);
+
 	return uart_rx_enable(uart_dev, buf, len, timeout);
 }
 
 int uart_dma_context_rx_disable(const struct device *uart_dev)
 {
+	k_spinlock_key_t key = k_spin_lock(&lock);
+	struct uart_dma_context *ctx = find_context(uart_dev);
+
+	if (ctx != NULL) {
+		ctx->rx_disabling = true;
+	}
+
+	k_spin_unlock(&lock, key);
+
 	return uart_rx_disable(uart_dev);
 }
 

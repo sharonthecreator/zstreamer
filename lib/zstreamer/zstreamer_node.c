@@ -123,8 +123,8 @@ int zstreamer_start(const struct device *dev)
 		return -EALREADY;
 	}
 
-	if (api->start != NULL) {
-		ret = api->start(dev);
+	if (api->open != NULL) {
+		ret = api->open(dev);
 		if (ret != 0) {
 			atomic_set(&data->running, 0);
 			return ret;
@@ -169,8 +169,8 @@ int zstreamer_stop(const struct device *dev)
 
 	drain_fifo(&data->fifo);
 
-	if (api->stop != NULL) {
-		api->stop(dev);
+	if (api->close != NULL) {
+		api->close(dev);
 	}
 
 	return 0;

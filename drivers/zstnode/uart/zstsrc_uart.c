@@ -52,7 +52,7 @@ static void zstsrc_uart_rx_handler(void *user_data, const uint8_t *data,
 	k_sem_give(&drv_data->rx_sem);
 }
 
-static int zstsrc_uart_start_dma(const struct device *dev)
+static int zstsrc_uart_open_dma(const struct device *dev)
 {
 	const struct zstsrc_uart_config *cfg = dev->config;
 	struct zstsrc_uart_data *data = dev->data;
@@ -79,7 +79,7 @@ static int zstsrc_uart_start_dma(const struct device *dev)
 	return 0;
 }
 
-static int zstsrc_uart_stop_dma(const struct device *dev)
+static int zstsrc_uart_close_dma(const struct device *dev)
 {
 	const struct zstsrc_uart_config *cfg = dev->config;
 	struct zstsrc_uart_data *data = dev->data;
@@ -160,13 +160,13 @@ static int zstsrc_uart_run(const struct device *dev)
 }
 
 #if defined(CONFIG_UART_ASYNC_API)
-static int zstsrc_uart_start(const struct device *dev)
+static int zstsrc_uart_open(const struct device *dev)
 {
 	const struct zstsrc_uart_config *cfg = dev->config;
 	int ret;
 
 	/* Try to enable DMA, fall back to polling if it fails. */
-	ret = zstsrc_uart_start_dma(dev);
+	ret = zstsrc_uart_open_dma(dev);
 	if (ret != 0) {
 		LOG_INF("DMA not available for %s, using polling",
 			cfg->uart_dev->name);
@@ -174,16 +174,16 @@ static int zstsrc_uart_start(const struct device *dev)
 	return 0;
 }
 
-static int zstsrc_uart_stop(const struct device *dev)
+static int zstsrc_uart_close(const struct device *dev)
 {
-	return zstsrc_uart_stop_dma(dev);
+	return zstsrc_uart_close_dma(dev);
 }
 #endif
 
 static const struct zstnode_driver_api zstsrc_uart_api = {
 #if defined(CONFIG_UART_ASYNC_API)
-	.start = zstsrc_uart_start,
-	.stop = zstsrc_uart_stop,
+	.open = zstsrc_uart_open,
+	.close = zstsrc_uart_close,
 #endif
 	.run = zstsrc_uart_run,
 };

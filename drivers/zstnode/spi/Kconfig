@@ -22,28 +22,11 @@ config ZSTNODE_SPI_SINK
 	  Enable the SPI sink streaming node driver.
 	  Writes received buffer data to an SPI device (as master).
 
-config ZSTNODE_SPI_DMA
-	bool "SPI DMA/async support for zstnode"
-	default y
-	depends on SPI_ASYNC
-	depends on (ZSTNODE_SPI_SRC || ZSTNODE_SPI_SINK)
-	help
-	  Enable DMA/async SPI support for zstnode drivers.
-	  When enabled, SPI source and sink nodes will automatically
-	  use DMA transfers when available, falling back to polling
-	  if the SPI device doesn't support async API.
-
-config ZSTNODE_SPI_DMA_MAX_CONTEXTS
-	int "Maximum number of SPI DMA contexts"
-	default 4
-	depends on ZSTNODE_SPI_DMA
-	help
-	  Maximum number of SPI devices that can simultaneously use
-	  DMA with the shared context system.
-
 config ZSTNODE_SPI_DMA_RX_BUF_SIZE
 	int "SPI DMA RX buffer size"
 	default 256
-	depends on ZSTNODE_SPI_DMA
+	depends on SPI_ASYNC
+	depends on ZSTNODE_SPI_SRC
 	help
-	  Size in bytes of the DMA receive buffer for SPI source nodes.
+	  Size in bytes of the intermediate receive buffer used for
+	  async SPI reads. Only used when SPI_ASYNC is available.

@@ -7,28 +7,20 @@
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
-#include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 
 #include <zephyr/drivers/zstnode.h>
 #include <zstreamer/zstreamer.h>
 
-#if defined(CONFIG_SPI_ASYNC)
-#include "spi_dma_context.h"
-#endif
-
 LOG_MODULE_REGISTER(zstsrc_spi, CONFIG_ZSTNODE_LOG_LEVEL);
 
-#if defined(CONFIG_SPI_ASYNC)
 #ifndef CONFIG_ZSTNODE_SPI_DMA_RX_BUF_SIZE
 #define CONFIG_ZSTNODE_SPI_DMA_RX_BUF_SIZE 256
-#endif
 #endif
 
 struct zstsrc_spi_config {
 	struct zstnode_common_config common;
-	const struct device *spi_dev;
-	struct spi_config spi_cfg;
+	struct spi_dt_spec spi;
 	size_t rx_length;
 };
 
@@ -36,59 +28,21 @@ struct zstsrc_spi_data {
 	struct zstnode_common_data common;
 #if defined(CONFIG_SPI_ASYNC)
 	uint8_t dma_rx_buf[CONFIG_ZSTNODE_SPI_DMA_RX_BUF_SIZE];
-	struct k_sem rx_sem;
-	int rx_result;
-	bool dma_enabled;
+	struct k_poll_signal sig;
+	struct k_poll_event evt;
+	bool async_enabled;
 #endif
 };
 
 #if defined(CONFIG_SPI_ASYNC)
 
-static void zstsrc_spi_rx_handler(void *user_data, int result)
-{
-	struct zstsrc_spi_data *data = user_data;
-
-	data->rx_result = result;
-	k_sem_give(&data->rx_sem);
-}
-
-static int zstsrc_spi_start_dma(const struct device *dev)
-{
-	const struct zstsrc_spi_config *cfg = dev->config;
-	struct zstsrc_spi_data *data = dev->data;
-	int ret;
-
-	ret = spi_dma_context_register_rx(cfg->spi_dev,
-					  zstsrc_spi_rx_handler, data);
-	if (ret != 0) {
-		LOG_ERR("Failed to register SPI RX handler: %d", ret);
-		return ret;
-	}
-
-	data->dma_enabled = true;
-	LOG_DBG("SPI DMA RX enabled");
-	return 0;
-}
-
-static int zstsrc_spi_stop_dma(const struct device *dev)
-{
-	const struct zstsrc_spi_config *cfg = dev->config;
-	struct zstsrc_spi_data *data = dev->data;
-
-	if (data->dma_enabled) {
-		spi_dma_context_unregister_rx(cfg->spi_dev);
-		data->dma_enabled = false;
-	}
-	return 0;
-}
-
-static int zstsrc_spi_run_dma(const struct device *dev)
+static int zstsrc_spi_run_async(const struct device *dev)
 {
 	const struct zstsrc_spi_config *cfg = dev->config;
 	struct zstsrc_spi_data *data = dev->data;
 	struct net_buf *buf;
 	size_t rx_len;
-	int ret;
+	int ret, result;
 
 	rx_len = MIN(cfg->rx_length, sizeof(data->dma_rx_buf));
 
@@ -101,20 +55,25 @@ static int zstsrc_spi_run_dma(const struct device *dev)
 		.count = 1,
 	};
 
-	ret = spi_dma_context_read_async(cfg->spi_dev, &cfg->spi_cfg, &rx_bufs);
-	if (ret != 0) {
+	k_poll_signal_reset(&data->sig);
+	data->evt.state = K_POLL_STATE_NOT_READY;
+
+	ret = spi_read_signal(cfg->spi.bus, &cfg->spi.config,
+			      &rx_bufs, &data->sig);
+	if (ret < 0) {
 		LOG_ERR("SPI async read failed: %d", ret);
 		return 0;
 	}
 
-	/* Wait for completion. */
-	if (k_sem_take(&data->rx_sem, K_MSEC(1000)) != 0) {
-		LOG_WRN("SPI RX timeout");
+	ret = k_poll(&data->evt, 1, K_MSEC(1000));
+	if (ret < 0) {
+		LOG_WRN("SPI RX poll timeout");
 		return 0;
 	}
 
-	if (data->rx_result != 0) {
-		LOG_ERR("SPI RX error: %d", data->rx_result);
+	result = data->sig.result;
+	if (result < 0) {
+		LOG_ERR("SPI RX error: %d", result);
 		return 0;
 	}
 
@@ -125,9 +84,41 @@ static int zstsrc_spi_run_dma(const struct device *dev)
 	}
 
 	size_t copy_len = MIN(rx_len, net_buf_tailroom(buf));
+
 	net_buf_add_mem(buf, data->dma_rx_buf, copy_len);
 
 	return zstreamer_submit_buffer(dev, buf);
+}
+
+static int zstsrc_spi_open_async(const struct device *dev)
+{
+	const struct zstsrc_spi_config *cfg = dev->config;
+	struct zstsrc_spi_data *data = dev->data;
+	uint8_t dummy;
+	struct spi_buf test_buf = { .buf = &dummy, .len = 1 };
+	struct spi_buf_set test_bufs = { .buffers = &test_buf, .count = 1 };
+	int ret;
+
+	k_poll_signal_reset(&data->sig);
+	data->evt.state = K_POLL_STATE_NOT_READY;
+
+	ret = spi_read_signal(cfg->spi.bus, &cfg->spi.config,
+			      &test_bufs, &data->sig);
+	if (ret == -ENOTSUP) {
+		LOG_INF("SPI async not supported, using polling");
+		return -ENOTSUP;
+	}
+	if (ret < 0) {
+		LOG_WRN("SPI async probe failed: %d, using polling", ret);
+		return ret;
+	}
+
+	/* Wait for probe transfer to complete. */
+	k_poll(&data->evt, 1, K_MSEC(100));
+
+	data->async_enabled = true;
+	LOG_DBG("SPI async RX enabled");
+	return 0;
 }
 
 #endif /* CONFIG_SPI_ASYNC */
@@ -154,8 +145,8 @@ static int zstsrc_spi_run_poll(const struct device *dev)
 		.count = 1,
 	};
 
-	ret = spi_read(cfg->spi_dev, &cfg->spi_cfg, &rx_bufs);
-	if (ret != 0) {
+	ret = spi_read_dt(&cfg->spi, &rx_bufs);
+	if (ret < 0) {
 		LOG_ERR("SPI read failed: %d", ret);
 		net_buf_unref(buf);
 		k_msleep(1);
@@ -163,7 +154,16 @@ static int zstsrc_spi_run_poll(const struct device *dev)
 	}
 
 	net_buf_add(buf, rx_len);
-	return zstreamer_submit_buffer(dev, buf);
+
+	ret = zstreamer_submit_buffer(dev, buf);
+
+	/* On real hardware the SPI transaction itself takes time; on
+	 * emulators it completes instantly.  Sleep briefly to avoid
+	 * busy-looping and to let the simulated clock advance.
+	 */
+	k_msleep(1);
+
+	return ret;
 }
 
 static int zstsrc_spi_run(const struct device *dev)
@@ -171,38 +171,34 @@ static int zstsrc_spi_run(const struct device *dev)
 #if defined(CONFIG_SPI_ASYNC)
 	struct zstsrc_spi_data *data = dev->data;
 
-	if (data->dma_enabled) {
-		return zstsrc_spi_run_dma(dev);
+	if (data->async_enabled) {
+		return zstsrc_spi_run_async(dev);
 	}
 #endif
 	return zstsrc_spi_run_poll(dev);
 }
 
-#if defined(CONFIG_SPI_ASYNC)
-static int zstsrc_spi_start(const struct device *dev)
+static int zstsrc_spi_open(const struct device *dev)
 {
-	const struct zstsrc_spi_config *cfg = dev->config;
-	int ret;
-
-	ret = zstsrc_spi_start_dma(dev);
-	if (ret != 0) {
-		LOG_INF("SPI DMA not available for %s, using polling",
-			cfg->spi_dev->name);
-	}
+#if defined(CONFIG_SPI_ASYNC)
+	zstsrc_spi_open_async(dev);
+#endif
 	return 0;
 }
 
-static int zstsrc_spi_stop(const struct device *dev)
+static int zstsrc_spi_close(const struct device *dev)
 {
-	return zstsrc_spi_stop_dma(dev);
-}
+#if defined(CONFIG_SPI_ASYNC)
+	struct zstsrc_spi_data *data = dev->data;
+
+	data->async_enabled = false;
 #endif
+	return 0;
+}
 
 static const struct zstnode_driver_api zstsrc_spi_api = {
-#if defined(CONFIG_SPI_ASYNC)
-	.start = zstsrc_spi_start,
-	.stop = zstsrc_spi_stop,
-#endif
+	.open = zstsrc_spi_open,
+	.close = zstsrc_spi_close,
 	.run = zstsrc_spi_run,
 };
 
@@ -211,7 +207,9 @@ static int zstsrc_spi_init(const struct device *dev)
 {
 	struct zstsrc_spi_data *data = dev->data;
 
-	k_sem_init(&data->rx_sem, 0, 1);
+	k_poll_signal_init(&data->sig);
+	k_poll_event_init(&data->evt, K_POLL_TYPE_SIGNAL,
+			  K_POLL_MODE_NOTIFY_ONLY, &data->sig);
 	return 0;
 }
 #define ZSTSRC_SPI_INIT_FN zstsrc_spi_init
@@ -219,10 +217,7 @@ static int zstsrc_spi_init(const struct device *dev)
 #define ZSTSRC_SPI_INIT_FN NULL
 #endif
 
-/* Build SPI config from devicetree properties. */
-#define ZSTSRC_SPI_CONFIG_FLAGS(inst)                                          \
-	(DT_INST_PROP(inst, spi_cpol) ? SPI_MODE_CPOL : 0) |                    \
-	(DT_INST_PROP(inst, spi_cpha) ? SPI_MODE_CPHA : 0)
+#define SPI_DEV_NODE(inst) DT_INST_PHANDLE(inst, spi_device)
 
 #define ZSTSRC_SPI_DEFINE(inst)                                                \
 	Z_ZSTNODE_CHILDREN_DEFINE(inst, DT_DRV_INST(inst));                    \
@@ -238,13 +233,9 @@ static int zstsrc_spi_init(const struct device *dev)
 			ZSTNODE_TYPE_SOURCE,                                   \
 			DT_INST_PROP(inst, thread_stack_size),                 \
 			DT_INST_PROP(inst, thread_priority)),                  \
-		.spi_dev = DEVICE_DT_GET(                                      \
-			DT_INST_PHANDLE(inst, spi_device)),                    \
-		.spi_cfg = {                                                   \
-			.frequency = DT_INST_PROP(inst, spi_max_frequency),    \
-			.operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) |    \
-				     ZSTSRC_SPI_CONFIG_FLAGS(inst),             \
-		},                                                             \
+		.spi = SPI_DT_SPEC_GET(SPI_DEV_NODE(inst),                    \
+				       SPI_OP_MODE_MASTER | SPI_WORD_SET(8),   \
+				       0),                                     \
 		.rx_length = DT_INST_PROP(inst, rx_length),                    \
 	};                                                                     \
 	Z_ZSTNODE_INIT_WRAPPER_DEFINE(inst, ZSTSRC_SPI_INIT_FN)                \
