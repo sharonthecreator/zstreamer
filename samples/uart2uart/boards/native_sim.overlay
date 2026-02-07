@@ -26,7 +26,7 @@
 		compatible = "zstreamer,graph";
 		#address-cells = <1>;
 		#size-cells = <0>;
-		buf-num = <8>;
+		buffer-count = <8>;
 		buffer-size = <128>;
 
 		uart_source: uart-source@0 {
