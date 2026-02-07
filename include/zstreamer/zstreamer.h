@@ -40,7 +40,7 @@ struct zstreamer_graph_data {
  * @brief Start a streaming node.
  *
  * For source/sink nodes this creates the dedicated thread.
- * Calls the driver's optional start callback.
+ * Calls the driver's optional open callback.
  *
  * @param dev Node device.
  * @return 0 on success, negative errno on failure.
@@ -51,7 +51,7 @@ int zstreamer_start(const struct device *dev);
  * @brief Stop a streaming node.
  *
  * Clears the running flag, joins the thread (src/sink), drains the fifo,
- * and calls the driver's optional stop callback.
+ * and calls the driver's optional close callback.
  *
  * @param dev Node device.
  * @return 0 on success, negative errno on failure.

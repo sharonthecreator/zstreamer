@@ -1,0 +1,9 @@
+# Copyright (c) 2026 zstreamer contributors
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  drivers.zstnode.spi:
+    tags: drivers zstnode zstreamer spi
+    platform_allow:
+      - native_sim
+      - native_sim/native/64

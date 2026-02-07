@@ -5,6 +5,10 @@ description: |
   SPI source node. Reads bytes from an SPI device (as master)
   and submits them as buffers to downstream children.
 
+  The spi-device phandle must reference a device node that is a
+  child of an SPI bus controller. SPI bus parameters (frequency,
+  cpol, cpha, chip-select) are taken from that device node.
+
 compatible: "zstreamer,zstsrc-spi"
 
 include: zstreamer,zstsrc.yaml
@@ -13,25 +17,10 @@ properties:
   spi-device:
     type: phandle
     required: true
-    description: Phandle to the SPI bus controller.
-
-  spi-cs-gpios:
-    type: phandle-array
     description: |
-      GPIO for chip select. If not specified, hardware CS is used.
-
-  spi-max-frequency:
-    type: int
-    default: 1000000
-    description: Maximum SPI clock frequency in Hz.
-
-  spi-cpol:
-    type: boolean
-    description: Set clock polarity (CPOL=1).
-
-  spi-cpha:
-    type: boolean
-    description: Set clock phase (CPHA=1).
+      Phandle to an SPI peripheral device node (a child of an SPI
+      bus controller). SPI configuration (frequency, mode, CS) is
+      derived from this node's standard SPI properties.
 
   rx-length:
     type: int

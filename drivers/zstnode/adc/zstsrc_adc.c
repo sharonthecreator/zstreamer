@@ -157,9 +157,9 @@ static int zstsrc_adc_init(const struct device *dev)
 }
 
 /**
- * Start ADC capture.
+ * Open ADC capture hardware.
  */
-static int zstsrc_adc_start(const struct device *dev)
+static int zstsrc_adc_open(const struct device *dev)
 {
 	struct zstsrc_adc_data *data = dev->data;
 	int ret;
@@ -171,16 +171,16 @@ static int zstsrc_adc_start(const struct device *dev)
 #endif
 
 	if (ret == 0) {
-		LOG_DBG("ADC source started");
+		LOG_DBG("ADC source opened");
 	}
 
 	return ret;
 }
 
 /**
- * Stop ADC capture.
+ * Close ADC capture hardware.
  */
-static int zstsrc_adc_stop(const struct device *dev)
+static int zstsrc_adc_close(const struct device *dev)
 {
 	struct zstsrc_adc_data *data = dev->data;
 	int ret;
@@ -192,7 +192,7 @@ static int zstsrc_adc_stop(const struct device *dev)
 #endif
 
 	if (ret == 0) {
-		LOG_DBG("ADC source stopped");
+		LOG_DBG("ADC source closed");
 	}
 
 	return ret;
@@ -254,8 +254,8 @@ static int zstsrc_adc_run(const struct device *dev)
  */
 
 static const struct zstnode_driver_api zstsrc_adc_api = {
-	.start = zstsrc_adc_start,
-	.stop = zstsrc_adc_stop,
+	.open = zstsrc_adc_open,
+	.close = zstsrc_adc_close,
 	.run = zstsrc_adc_run,
 };
 

@@ -67,16 +67,16 @@ struct zstnode_common_data {
 /**
  * @brief zstnode driver API structure.
  *
- * @param start  Optional. Called when the node is started.
- * @param stop   Optional. Called when the node is stopped.
- * @param run    Source nodes only. Called in a loop from the source thread.
- *               Return 0 to continue, non-zero to stop.
+ * @param open    Optional. Called to set up hardware before streaming begins.
+ * @param close   Optional. Called to tear down hardware after streaming ends.
+ * @param run     Source nodes only. Called in a loop from the source thread.
+ *                Return 0 to continue, non-zero to stop.
  * @param process Sink/generic nodes. Called for each received buffer.
- *               Return 0 on success, non-zero on error.
+ *                Return 0 on success, non-zero on error.
  */
 __subsystem struct zstnode_driver_api {
-	int (*start)(const struct device *dev);
-	int (*stop)(const struct device *dev);
+	int (*open)(const struct device *dev);
+	int (*close)(const struct device *dev);
 	int (*run)(const struct device *dev);
 	int (*process)(const struct device *dev, struct net_buf *buf);
 };
