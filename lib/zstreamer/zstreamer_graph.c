@@ -16,7 +16,7 @@ LOG_MODULE_REGISTER(zstreamer_graph, CONFIG_ZSTREAMER_LOG_LEVEL);
 #define GRAPH_POOL_DEFINE(inst)                                                \
 	NET_BUF_POOL_FIXED_DEFINE(                                             \
 		graph_pool_##inst,                                             \
-		DT_INST_PROP(inst, buf_num),                                   \
+		DT_INST_PROP(inst, buffer_count),                                   \
 		DT_INST_PROP(inst, buffer_size),                               \
 		0, NULL)
 

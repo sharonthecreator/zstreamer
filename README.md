@@ -113,7 +113,7 @@ bindings add `thread-stack-size` (default 1024) and `thread-priority`
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `buf-num` | int | 8 | Number of buffers in the `net_buf` pool |
+| `buffer-count` | int | 8 | Number of buffers in the `net_buf` pool |
 | `buffer-size` | int | 2048 | Size of each buffer in bytes |
 
 ### Example: UART-to-UART relay with DMA
@@ -140,7 +140,7 @@ bindings add `thread-stack-size` (default 1024) and `thread-priority`
         compatible = "zstreamer,graph";
         #address-cells = <1>;
         #size-cells = <0>;
-        buf-num = <8>;
+        buffer-count = <8>;
         buffer-size = <128>;
 
         uart_source: uart-source@0 {
@@ -172,7 +172,7 @@ configuration.
         compatible = "zstreamer,graph";
         #address-cells = <1>;
         #size-cells = <0>;
-        buf-num = <8>;
+        buffer-count = <8>;
         buffer-size = <1024>;
 
         adc_source: adc-source@0 {
@@ -524,7 +524,7 @@ zstreamer/
 │   └── zstreamer_node.c                    # Node lifecycle, threads, buffer routing
 ├── dts/bindings/streaming/
 │   ├── zstnode.yaml                        # Base: children phandle array
-│   ├── zstreamer,graph.yaml                # Graph: buf-num, buffer-size
+│   ├── zstreamer,graph.yaml                # Graph: buffer-count, buffer-size
 │   ├── zstreamer,zstsrc.yaml               # Source base: thread-stack-size, priority
 │   ├── zstreamer,zstsink.yaml              # Sink base: thread-stack-size, priority
 │   ├── zstreamer,zstsrc-uart.yaml          # UART source
