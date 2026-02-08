@@ -190,10 +190,10 @@ static int zstsink_spi_init(const struct device *dev)
 			zstnode_stack_##inst),                                  \
 	};                                                                     \
 	static const struct zstsink_spi_config zstsink_spi_config_##inst = {   \
-		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
+		.common = { Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                 \
 			DT_DRV_INST(inst),                                     \
 			DT_INST_PROP(inst, thread_stack_size),                 \
-			DT_INST_PROP(inst, thread_priority)),                  \
+			DT_INST_PROP(inst, thread_priority)) },                \
 		.spi = SPI_DT_SPEC_GET(SPI_DEV_NODE(inst),                    \
 				       SPI_OP_MODE_MASTER | SPI_WORD_SET(8),   \
 				       0),                                     \

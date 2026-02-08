@@ -39,28 +39,55 @@ static void distribute_to_children(const struct device *dev,
 		return;
 	}
 
-	/* Clone for all children except the last. */
-	for (size_t i = 0; i < cfg->num_children - 1; i++) {
-		const struct device *child = cfg->children[i];
+	if (cfg->num_children == 1) {
 		struct zstnode_common_data *child_data =
-			(struct zstnode_common_data *)child->data;
-		struct net_buf *clone = net_buf_clone(buf, K_NO_WAIT);
+			(struct zstnode_common_data *)cfg->children[0]->data;
 
-		if (clone != NULL) {
-			k_fifo_put(&child_data->fifo, clone);
-		} else {
-			LOG_ERR("clone failed for %s", child->name);
+		k_fifo_put(&child_data->fifo, buf);
+		return;
+	}
+
+	/*
+	 * Fan-out with copy-on-write: give the original buffer to one
+	 * readonly child (it promises not to modify the data), clone
+	 * for everyone else.  If no child is readonly, the last child
+	 * gets the original (legacy behaviour).
+	 */
+	int orig_idx = -1;
+
+	for (size_t i = 0; i < cfg->num_children; i++) {
+		const struct zstnode_common_config *child_cfg =
+			(const struct zstnode_common_config *)
+			cfg->children[i]->config;
+
+		if (child_cfg->readonly) {
+			orig_idx = (int)i;
+			break;
 		}
 	}
 
-	/* Last child gets the original buffer (transfer ownership). */
-	{
-		const struct device *child =
-			cfg->children[cfg->num_children - 1];
-		struct zstnode_common_data *child_data =
-			(struct zstnode_common_data *)child->data;
+	if (orig_idx < 0) {
+		/* No readonly child — last gets original (legacy). */
+		orig_idx = (int)(cfg->num_children - 1);
+	}
 
-		k_fifo_put(&child_data->fifo, buf);
+	for (size_t i = 0; i < cfg->num_children; i++) {
+		struct zstnode_common_data *child_data =
+			(struct zstnode_common_data *)cfg->children[i]->data;
+
+		if ((int)i == orig_idx) {
+			k_fifo_put(&child_data->fifo, buf);
+		} else {
+			struct net_buf *clone =
+				net_buf_clone(buf, K_NO_WAIT);
+
+			if (clone != NULL) {
+				k_fifo_put(&child_data->fifo, clone);
+			} else {
+				LOG_ERR("clone failed for %s",
+					cfg->children[i]->name);
+			}
+		}
 	}
 }
 

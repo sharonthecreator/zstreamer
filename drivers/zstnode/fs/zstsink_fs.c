@@ -196,10 +196,10 @@ int zstsink_fs_set_filename_handler(const struct device *dev,
 			zstnode_stack_##inst),                                  \
 	};                                                                     \
 	static const struct zstsink_fs_config zstsink_fs_config_##inst = {     \
-		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
+		.common = { Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                 \
 			DT_DRV_INST(inst),                                     \
 			DT_INST_PROP(inst, thread_stack_size),                 \
-			DT_INST_PROP(inst, thread_priority)),                  \
+			DT_INST_PROP(inst, thread_priority)) },                \
 		.mount_path = DT_INST_PROP(inst, mount_path),                  \
 		.delta_ms_threshold = DT_INST_PROP(inst, delta_ms_threshold),  \
 		.size_threshold = DT_INST_PROP(inst, size_threshold),          \

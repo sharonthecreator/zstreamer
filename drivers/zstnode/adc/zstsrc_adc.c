@@ -276,10 +276,10 @@ static const struct zstnode_driver_api zstsrc_adc_api = {
 			zstnode_stack_##inst),                                 \
 	};                                                                     \
 	static const struct zstsrc_adc_config zstsrc_adc_config_##inst = {     \
-		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
+		.common = { Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                 \
 			DT_DRV_INST(inst),                                     \
 			DT_INST_PROP(inst, thread_stack_size),                 \
-			DT_INST_PROP(inst, thread_priority)),                  \
+			DT_INST_PROP(inst, thread_priority)) },                \
 		.adc_dev = ADC_DEV_GET(DT_DRV_INST(inst)),                     \
 		.adc_channels = {                                              \
 			ADC_CHANNEL_GET(DT_DRV_INST(inst), 0),                 \

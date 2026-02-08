@@ -203,9 +203,9 @@ struct zstnode_common_config {
     const struct device *graph;              /* parent graph device */
     const struct device * const *children;   /* downstream node array */
     size_t num_children;
-    enum zstnode_type type;                  /* SOURCE, SINK, GENERIC */
     size_t thread_stack_size;
     int thread_priority;
+    bool readonly;        /* copy-on-write: node won't modify buffers */
 };
 
 /* Populated at init time by zstnode_common_init() */
@@ -332,11 +332,10 @@ static const struct zstnode_driver_api zstsink_mydev_api = {
             zstnode_stack_##inst),                                          \
     };                                                                     \
     static const struct zstsink_mydev_config zstsink_mydev_cfg_##inst = {  \
-        .common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                       \
+        .common = { Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                     \
             DT_DRV_INST(inst),                                             \
-            ZSTNODE_TYPE_SINK,                                             \
             DT_INST_PROP(inst, thread_stack_size),                         \
-            DT_INST_PROP(inst, thread_priority)),                          \
+            DT_INST_PROP(inst, thread_priority)) },                        \
         .hw_dev = DEVICE_DT_GET(DT_INST_PHANDLE(inst, my_device)),        \
     };                                                                     \
     Z_ZSTNODE_INIT_WRAPPER_DEFINE(inst, NULL)                              \
@@ -353,7 +352,8 @@ Key points:
 
 - `Z_ZSTNODE_CHILDREN_DEFINE` generates the `children[]` array from DTS phandles.
 - `Z_ZSTNODE_COMMON_CONFIG_INIT` populates the common config (graph pointer,
-  children, type, thread params).
+  children, thread params). Wrap it in `{ }` so you can append `.readonly = true`
+  for nodes that promise not to modify buffers (copy-on-write optimisation).
 - `Z_ZSTNODE_COMMON_DATA_INIT` sets the thread stack pointer.
 - `Z_ZSTNODE_INIT_WRAPPER_DEFINE` creates an init function that optionally
   calls a driver init, then calls `zstnode_common_init()` (which sets the

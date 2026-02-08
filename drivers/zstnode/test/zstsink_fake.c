@@ -42,10 +42,10 @@ static const struct zstnode_driver_api zstsink_fake_api = {
 			zstnode_stack_##inst),                                  \
 	};                                                                     \
 	static const struct zstsink_fake_config zstsink_fake_config_##inst = { \
-		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
+		.common = { Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                 \
 			DT_DRV_INST(inst),                                     \
 			DT_INST_PROP(inst, thread_stack_size),                 \
-			DT_INST_PROP(inst, thread_priority)),                  \
+			DT_INST_PROP(inst, thread_priority)) },                \
 	};                                                                     \
 	Z_ZSTNODE_INIT_WRAPPER_DEFINE(inst, NULL)                              \
 	DEVICE_DT_INST_DEFINE(inst, zstnode_init_##inst, NULL,                 \

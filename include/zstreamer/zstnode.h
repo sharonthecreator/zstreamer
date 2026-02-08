@@ -39,6 +39,7 @@ struct zstnode_common_config {
 	size_t num_children;
 	size_t thread_stack_size;
 	int thread_priority;
+	bool readonly;
 };
 
 /**
@@ -150,13 +151,11 @@ extern int zstnode_common_init(const struct device *dev);
  * Common config initializer.
  */
 #define Z_ZSTNODE_COMMON_CONFIG_INIT(inst, node_id, _stack_size, _prio)        \
-	{                                                                      \
 		.graph = DEVICE_DT_GET(DT_PARENT(node_id)),                    \
 		.children = zstnode_children_##inst,                            \
 		.num_children = Z_ZSTNODE_NUM_CHILDREN(node_id),               \
 		.thread_stack_size = _stack_size,                               \
-		.thread_priority = _prio,                                      \
-	}
+		.thread_priority = _prio
 
 /*
  * Common data initializer.

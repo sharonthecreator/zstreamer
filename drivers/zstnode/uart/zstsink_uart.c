@@ -172,10 +172,10 @@ static int zstsink_uart_init(const struct device *dev)
 			zstnode_stack_##inst),                                  \
 	};                                                                     \
 	static const struct zstsink_uart_config zstsink_uart_config_##inst = { \
-		.common = Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                   \
+		.common = { Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                 \
 			DT_DRV_INST(inst),                                     \
 			DT_INST_PROP(inst, thread_stack_size),                 \
-			DT_INST_PROP(inst, thread_priority)),                  \
+			DT_INST_PROP(inst, thread_priority)) },                \
 		.uart_dev = DEVICE_DT_GET(                                     \
 			DT_INST_PHANDLE(inst, uart_device)),                   \
 	};                                                                     \
