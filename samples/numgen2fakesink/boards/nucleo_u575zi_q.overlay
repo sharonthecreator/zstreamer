@@ -13,12 +13,12 @@
 		buffer-size = <128>;
 
 		numgen_source: numgen-source {
-			compatible = "zstreamer,zstsrc-numgen";
+			compatible = "zstreamer,src-numgen";
 			children = <&fake_sinker>;
 		};
 
 		fake_sinker: fake-sinker {
-			compatible = "zstreamer,zstsink-fake";
+			compatible = "zstreamer,sink-fake";
 		};
 	};
 };

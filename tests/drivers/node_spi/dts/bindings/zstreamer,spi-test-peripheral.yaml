@@ -1,0 +1,11 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  SPI test peripheral for zstreamer node SPI driver tests.
+  Provides a programmable RX buffer and captures TX data.
+
+compatible: "zstreamer,spi-test-peripheral"
+
+include:
+  - name: spi-device.yaml

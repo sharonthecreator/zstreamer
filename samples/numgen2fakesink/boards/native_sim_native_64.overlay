@@ -1,1 +1,24 @@
-native_sim.overlay
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Number generator to fake sink on native_sim.
+ * Software-only pipeline — no hardware dependencies.
+ */
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <8>;
+		buffer-size = <128>;
+
+		numgen_source: numgen-source {
+			compatible = "zstreamer,src-numgen";
+			children = <&fake_sinker>;
+		};
+
+		fake_sinker: fake-sinker {
+			compatible = "zstreamer,sink-fake";
+		};
+	};
+};

@@ -7,7 +7,7 @@
 #include <zephyr/net_buf.h>
 #include <zephyr/logging/log.h>
 
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/graph.h>
 
 LOG_MODULE_REGISTER(zstreamer_graph, CONFIG_ZSTREAMER_LOG_LEVEL);
 

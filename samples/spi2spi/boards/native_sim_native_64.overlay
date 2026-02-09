@@ -1,1 +1,42 @@
-native_sim.overlay
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * SPI-to-SPI relay on native_sim using emulated SPI.
+ */
+
+/ {
+	spi_src: spi-emul-src {
+		compatible = "zephyr,spi-emul-controller";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "okay";
+	};
+
+	spi_sink: spi-emul-sink {
+		compatible = "zephyr,spi-emul-controller";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "okay";
+	};
+
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <8>;
+		buffer-size = <128>;
+
+		spi_source: spi-source {
+			compatible = "zstreamer,src-spi";
+			spi-device = <&spi_src>;
+			spi-max-frequency = <1000000>;
+			rx-length = <64>;
+			children = <&spi_sinker>;
+		};
+
+		spi_sinker: spi-sinker {
+			compatible = "zstreamer,sink-spi";
+			spi-device = <&spi_sink>;
+			spi-max-frequency = <1000000>;
+		};
+	};
+};

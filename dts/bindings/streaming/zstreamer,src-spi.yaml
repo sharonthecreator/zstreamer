@@ -1,0 +1,30 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  SPI source node. Reads bytes from an SPI device (as master)
+  and submits them as buffers to downstream children.
+
+  The spi-device phandle must reference a device node that is a
+  child of an SPI bus controller. SPI bus parameters (frequency,
+  cpol, cpha, chip-select) are taken from that device node.
+
+compatible: "zstreamer,src-spi"
+
+include: zstreamer,src.yaml
+
+properties:
+  spi-device:
+    type: phandle
+    required: true
+    description: |
+      Phandle to an SPI peripheral device node (a child of an SPI
+      bus controller). SPI configuration (frequency, mode, CS) is
+      derived from this node's standard SPI properties.
+
+  rx-length:
+    type: int
+    default: 64
+    description: |
+      Number of bytes to read in each SPI transaction.
+      For continuous streaming, set this to the expected frame size.

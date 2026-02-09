@@ -3,5 +3,5 @@
 
 if(CONFIG_ZSTREAMER)
   add_subdirectory(lib/zstreamer)
-  add_subdirectory_ifdef(CONFIG_ZSTNODE drivers/zstnode)
+  add_subdirectory_ifdef(CONFIG_ZSTREAMER_NODE drivers/zstreamer)
 endif()

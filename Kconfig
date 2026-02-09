@@ -12,6 +12,6 @@ menuconfig ZSTREAMER
 if ZSTREAMER
 
 rsource "lib/zstreamer/Kconfig"
-rsource "drivers/zstnode/Kconfig"
+rsource "drivers/zstreamer/Kconfig"
 
 endif # ZSTREAMER

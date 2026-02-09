@@ -1,0 +1,23 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  SPI sink node. Writes received buffer data to an SPI device
+  (as master).
+
+  The spi-device phandle must reference a device node that is a
+  child of an SPI bus controller. SPI bus parameters (frequency,
+  cpol, cpha, chip-select) are taken from that device node.
+
+compatible: "zstreamer,sink-spi"
+
+include: zstreamer,sink.yaml
+
+properties:
+  spi-device:
+    type: phandle
+    required: true
+    description: |
+      Phandle to an SPI peripheral device node (a child of an SPI
+      bus controller). SPI configuration (frequency, mode, CS) is
+      derived from this node's standard SPI properties.

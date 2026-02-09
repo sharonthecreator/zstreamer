@@ -1,0 +1,20 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_NODE_TEST_NUMGEN_SRC
+	bool "Number generator source zstreamer_node driver"
+	default y
+	depends on DT_HAS_ZSTREAMER_SRC_NUMGEN_ENABLED
+	depends on ZSTREAMER_NODE
+	help
+	  Enable the number generator source streaming node driver.
+	  Produces sequential bytes 0-255 (wrapping) to fill each buffer.
+
+config ZSTREAMER_NODE_TEST_FAKESINK
+	bool "Fake sink zstreamer_node driver"
+	default y
+	depends on DT_HAS_ZSTREAMER_SINK_FAKE_ENABLED
+	depends on ZSTREAMER_NODE
+	help
+	  Enable the fake sink streaming node driver.
+	  Discards all received buffer data.

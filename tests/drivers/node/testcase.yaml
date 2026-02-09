@@ -1,0 +1,10 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  drivers.zstreamer_node.uart:
+    tags: drivers zstreamer_node zstreamer uart
+    platform_allow:
+      - native_sim
+      - native_sim/native/64
+      - qemu_cortex_m3

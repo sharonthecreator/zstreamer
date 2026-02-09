@@ -4,7 +4,7 @@ A graph-based streaming pipeline framework for [Zephyr RTOS](https://zephyrproje
 Inspired by the concepts of [GStreamer](https://gstreamer.freedesktop.org/),
 adapted for the constraints and conventions of embedded RTOS development.
 
-zstreamer models data pipelines as directed graphs of **zstnode** drivers
+zstreamer models data pipelines as directed graphs of **zstreamer_node** drivers
 described entirely in devicetree. Nodes are connected with phandle references,
 buffers are managed by a shared `net_buf` pool owned by the graph, and the
 framework handles thread creation, buffer routing, and lifecycle
@@ -90,21 +90,21 @@ shutdown before calling `api->close()`.
 
 ```
 base.yaml
-  └── zstnode.yaml              ← adds `children` (phandles)
-        ├── zstreamer,zstsrc.yaml   ← adds thread-stack-size, thread-priority
-        │     ├── zstreamer,zstsrc-uart.yaml
-        │     ├── zstreamer,zstsrc-spi.yaml
-        │     ├── zstreamer,zstsrc-adc.yaml
-        │     └── zstreamer,zstsrc-numgen.yaml
-        └── zstreamer,zstsink.yaml  ← adds thread-stack-size, thread-priority
-              ├── zstreamer,zstsink-uart.yaml
-              ├── zstreamer,zstsink-spi.yaml
-              ├── zstreamer,zstsink-fs.yaml
-              └── zstreamer,zstsink-fake.yaml
+  └── zstreamer,node.yaml              ← adds `children` (phandles)
+        ├── zstreamer,src.yaml   ← adds thread-stack-size, thread-priority
+        │     ├── zstreamer,src-uart.yaml
+        │     ├── zstreamer,src-spi.yaml
+        │     ├── zstreamer,src-adc.yaml
+        │     └── zstreamer,src-numgen.yaml
+        └── zstreamer,sink.yaml  ← adds thread-stack-size, thread-priority
+              ├── zstreamer,sink-uart.yaml
+              ├── zstreamer,sink-spi.yaml
+              ├── zstreamer,sink-fs.yaml
+              └── zstreamer,sink-fake.yaml
 ```
 
-All zstnode bindings inherit from `zstnode.yaml`, which provides the
-`children` property (phandle array). The `zstsrc` and `zstsink` base
+All node bindings inherit from `zstreamer,node.yaml`, which provides the
+`children` property (phandle array). The `src` and `sink` base
 bindings add `thread-stack-size` (default 1024) and `thread-priority`
 (default 5). Driver-specific bindings add hardware references
 (e.g., `uart-device`, `spi-device`, `io-channels`).
@@ -142,13 +142,13 @@ bindings add `thread-stack-size` (default 1024) and `thread-priority`
         buffer-size = <128>;
 
         uart_source: uart-source {
-            compatible = "zstreamer,zstsrc-uart";
+            compatible = "zstreamer,src-uart";
             uart-device = <&usart2>;
             children = <&uart_sinker>;
         };
 
         uart_sinker: uart-sinker {
-            compatible = "zstreamer,zstsink-uart";
+            compatible = "zstreamer,sink-uart";
             uart-device = <&usart3>;
         };
     };
@@ -156,8 +156,8 @@ bindings add `thread-stack-size` (default 1024) and `thread-priority`
 ```
 
 Note that UART baud rate, SPI frequency, and other bus parameters are
-configured on the bus device itself, **not** duplicated on the zstnode.
-The zstnode references the bus device via phandle and uses its existing
+configured on the bus device itself, **not** duplicated on the node.
+The node references the bus device via phandle and uses its existing
 configuration.
 
 ### Example: ADC capture to file with rotation
@@ -170,7 +170,7 @@ configuration.
         buffer-size = <1024>;
 
         adc_source: adc-source {
-            compatible = "zstreamer,zstsrc-adc";
+            compatible = "zstreamer,src-adc";
             io-channels = <&adc1 0>, <&adc1 1>;
             sample-rate-hz = <48000>;
             resolution = <12>;
@@ -181,7 +181,7 @@ configuration.
         };
 
         fs_sinker: fs-sinker {
-            compatible = "zstreamer,zstsink-fs";
+            compatible = "zstreamer,sink-fs";
             mount-path = "/lfs/data";
             size-threshold = <65536>;
             delta-ms-threshold = <60000>;
@@ -195,11 +195,11 @@ configuration.
 
 ### Common config and data
 
-Every zstnode driver embeds these as the **first member** named `common`:
+Every node driver embeds these as the **first member** named `common`:
 
 ```c
-/* Populated at compile time from DTS via Z_ZSTNODE_COMMON_CONFIG_INIT */
-struct zstnode_common_config {
+/* Populated at compile time from DTS via Z_ZSTREAMER_NODE_CONFIG_INIT */
+struct zstreamer_node_config {
     const struct device *graph;              /* parent graph device */
     const struct device * const *children;   /* downstream node array */
     size_t num_children;
@@ -208,8 +208,8 @@ struct zstnode_common_config {
     bool readonly;        /* copy-on-write: node won't modify buffers */
 };
 
-/* Populated at init time by zstnode_common_init() */
-struct zstnode_common_data {
+/* Populated at init time by zstreamer_node_common_init() */
+struct zstreamer_node_data {
     const struct device *dev;       /* back-pointer */
     struct k_fifo fifo;             /* incoming buffer queue */
     struct k_work work;             /* for GENERIC nodes only */
@@ -220,12 +220,12 @@ struct zstnode_common_data {
 ```
 
 The `common` member must be first so the framework can cast `dev->config`
-and `dev->data` to `zstnode_common_config *` / `zstnode_common_data *`.
+and `dev->data` to `zstreamer_node_config *` / `zstreamer_node_data *`.
 
 ### Driver API
 
 ```c
-__subsystem struct zstnode_driver_api {
+__subsystem struct zstreamer_node_driver_api {
     int (*open)(const struct device *dev);       /* optional, called on start */
     int (*close)(const struct device *dev);      /* optional, called on stop */
     int (*run)(const struct device *dev);        /* source only: called in loop */
@@ -266,11 +266,11 @@ same pattern but implement `run()` instead of `process()`.
 
 ### 1. DTS binding
 
-Create `dts/bindings/streaming/zstreamer,zstsink-mydev.yaml`:
+Create `dts/bindings/streaming/zstreamer,sink-mydev.yaml`:
 
 ```yaml
-compatible: "zstreamer,zstsink-mydev"
-include: zstreamer,zstsink.yaml
+compatible: "zstreamer,sink-mydev"
+include: zstreamer,sink.yaml
 
 properties:
   my-device:
@@ -281,111 +281,111 @@ properties:
 ### 2. Driver source
 
 ```c
-#define DT_DRV_COMPAT zstreamer_zstsink_mydev
+#define DT_DRV_COMPAT zstreamer_sink_mydev
 
 #include <zephyr/device.h>
-#include <zephyr/drivers/zstnode.h>
-#include <zstreamer/zstreamer.h>
+#include <zstreamer/node.h>
+#include <zstreamer/graph.h>
 
-struct zstsink_mydev_config {
-    struct zstnode_common_config common;   /* must be first */
+struct sink_mydev_config {
+    struct zstreamer_node_config common;   /* must be first */
     const struct device *hw_dev;
 };
 
-struct zstsink_mydev_data {
-    struct zstnode_common_data common;     /* must be first */
+struct sink_mydev_data {
+    struct zstreamer_node_data common;     /* must be first */
     /* driver-private fields here */
 };
 
-static int zstsink_mydev_open(const struct device *dev)
+static int sink_mydev_open(const struct device *dev)
 {
     /* set up hardware */
     return 0;
 }
 
-static int zstsink_mydev_process(const struct device *dev,
+static int sink_mydev_process(const struct device *dev,
                                  struct net_buf *buf)
 {
-    const struct zstsink_mydev_config *cfg = dev->config;
+    const struct sink_mydev_config *cfg = dev->config;
     /* write buf->data (buf->len bytes) to cfg->hw_dev */
     return 0;
 }
 
-static int zstsink_mydev_close(const struct device *dev)
+static int sink_mydev_close(const struct device *dev)
 {
     /* tear down hardware */
     return 0;
 }
 
-static const struct zstnode_driver_api zstsink_mydev_api = {
-    .open    = zstsink_mydev_open,
-    .process = zstsink_mydev_process,
-    .close   = zstsink_mydev_close,
+static const struct zstreamer_node_driver_api sink_mydev_api = {
+    .open    = sink_mydev_open,
+    .process = sink_mydev_process,
+    .close   = sink_mydev_close,
 };
 
-#define ZSTSINK_MYDEV_DEFINE(inst)                                         \
-    Z_ZSTNODE_CHILDREN_DEFINE(inst, DT_DRV_INST(inst));                    \
-    static K_THREAD_STACK_DEFINE(zstnode_stack_##inst,                      \
+#define SINK_MYDEV_DEFINE(inst)                                         \
+    Z_ZSTREAMER_NODE_CHILDREN_DEFINE(inst, DT_DRV_INST(inst));                    \
+    static K_THREAD_STACK_DEFINE(zstreamer_node_stack_##inst,                      \
         DT_INST_PROP(inst, thread_stack_size));                             \
-    static struct zstsink_mydev_data zstsink_mydev_data_##inst = {         \
-        .common = Z_ZSTNODE_COMMON_DATA_INIT(inst,                         \
-            zstnode_stack_##inst),                                          \
+    static struct sink_mydev_data sink_mydev_data_##inst = {         \
+        .common = Z_ZSTREAMER_NODE_DATA_INIT(inst,                         \
+            zstreamer_node_stack_##inst),                                          \
     };                                                                     \
-    static const struct zstsink_mydev_config zstsink_mydev_cfg_##inst = {  \
-        .common = { Z_ZSTNODE_COMMON_CONFIG_INIT(inst,                     \
+    static const struct sink_mydev_config sink_mydev_cfg_##inst = {  \
+        .common = { Z_ZSTREAMER_NODE_CONFIG_INIT(inst,                     \
             DT_DRV_INST(inst),                                             \
             DT_INST_PROP(inst, thread_stack_size),                         \
             DT_INST_PROP(inst, thread_priority)) },                        \
         .hw_dev = DEVICE_DT_GET(DT_INST_PHANDLE(inst, my_device)),        \
     };                                                                     \
-    Z_ZSTNODE_INIT_WRAPPER_DEFINE(inst, NULL)                              \
-    DEVICE_DT_INST_DEFINE(inst, zstnode_init_##inst, NULL,                 \
-        &zstsink_mydev_data_##inst,                                        \
-        &zstsink_mydev_cfg_##inst,                                         \
+    Z_ZSTREAMER_NODE_INIT_WRAPPER_DEFINE(inst, NULL)                              \
+    DEVICE_DT_INST_DEFINE(inst, zstreamer_node_init_##inst, NULL,                 \
+        &sink_mydev_data_##inst,                                        \
+        &sink_mydev_cfg_##inst,                                         \
         POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,                   \
-        &zstsink_mydev_api);
+        &sink_mydev_api);
 
-DT_INST_FOREACH_STATUS_OKAY(ZSTSINK_MYDEV_DEFINE)
+DT_INST_FOREACH_STATUS_OKAY(SINK_MYDEV_DEFINE)
 ```
 
 Key points:
 
-- `Z_ZSTNODE_CHILDREN_DEFINE` generates the `children[]` array from DTS phandles.
-- `Z_ZSTNODE_COMMON_CONFIG_INIT` populates the common config (graph pointer,
+- `Z_ZSTREAMER_NODE_CHILDREN_DEFINE` generates the `children[]` array from DTS phandles.
+- `Z_ZSTREAMER_NODE_CONFIG_INIT` populates the common config (graph pointer,
   children, thread params). Wrap it in `{ }` so you can append `.readonly = true`
   for nodes that promise not to modify buffers (copy-on-write optimisation).
-- `Z_ZSTNODE_COMMON_DATA_INIT` sets the thread stack pointer.
-- `Z_ZSTNODE_INIT_WRAPPER_DEFINE` creates an init function that optionally
-  calls a driver init, then calls `zstnode_common_init()` (which sets the
+- `Z_ZSTREAMER_NODE_DATA_INIT` sets the thread stack pointer.
+- `Z_ZSTREAMER_NODE_INIT_WRAPPER_DEFINE` creates an init function that optionally
+  calls a driver init, then calls `zstreamer_node_common_init()` (which sets the
   dev back-pointer, initializes the FIFO, and for generic nodes initializes
   the `k_work`).
 
 ### 3. Kconfig and CMake
 
 ```kconfig
-# drivers/zstnode/mydev/Kconfig
-config ZSTNODE_MYDEV_SINK
-    bool "My device sink zstnode driver"
+# drivers/zstreamer/mydev/Kconfig
+config ZSTREAMER_NODE_MYDEV_SINK
+    bool "My device sink node driver"
     default y
-    depends on DT_HAS_ZSTREAMER_ZSTSINK_MYDEV_ENABLED
-    depends on ZSTNODE
+    depends on DT_HAS_ZSTREAMER_SINK_MYDEV_ENABLED
+    depends on ZSTREAMER_NODE
 ```
 
 ```cmake
-# drivers/zstnode/mydev/CMakeLists.txt
+# drivers/zstreamer/mydev/CMakeLists.txt
 zephyr_library()
 zephyr_include_directories(${ZEPHYR_ZSTREAMER_MODULE_DIR}/include)
-zephyr_library_sources(zstsink_mydev.c)
+zephyr_library_sources(sink_mydev.c)
 ```
 
 Then wire it in the parent:
 
-- `drivers/zstnode/Kconfig`: add `rsource "mydev/Kconfig"`
-- `drivers/zstnode/CMakeLists.txt`: add `if(CONFIG_ZSTNODE_MYDEV_SINK) add_subdirectory(mydev) endif()`
+- `drivers/zstreamer/Kconfig`: add `rsource "mydev/Kconfig"`
+- `drivers/zstreamer/CMakeLists.txt`: add `if(CONFIG_ZSTREAMER_NODE_MYDEV_SINK) add_subdirectory(mydev) endif()`
 
 ## Included drivers
 
-### UART source/sink (`zstsrc-uart`, `zstsink-uart`)
+### UART source/sink (`src-uart`, `sink-uart`)
 
 References a UART device via `uart-device` phandle. Automatically uses
 DMA/async transfers when `CONFIG_UART_ASYNC_API` is enabled and the UART
@@ -393,24 +393,24 @@ driver supports it, falling back to `uart_poll_in`/`uart_poll_out`
 otherwise. A shared `uart_dma_context` allows both source (RX) and sink
 (TX) to coexist on the same UART using a single `uart_callback_set()`.
 
-### SPI source/sink (`zstsrc-spi`, `zstsink-spi`)
+### SPI source/sink (`src-spi`, `sink-spi`)
 
 References an SPI device via `spi-device` phandle. Probes async support at
 `open()` time using `k_poll_signal`; falls back to synchronous
 `spi_read_dt()`/`spi_write_dt()` if async is unavailable. SPI bus
 parameters (frequency, CPOL/CPHA, CS) come from the referenced SPI device
-node, not from the zstnode.
+node, not from the zstreamer node.
 
-### ADC source (`zstsrc-adc`)
+### ADC source (`src-adc`)
 
 Timer-triggered DMA capture for precise sample rates. Currently has an
-STM32-specific backend (`CONFIG_ZSTNODE_ADC_STM32`) that configures
+STM32-specific backend (`CONFIG_ZSTREAMER_NODE_ADC_STM32`) that configures
 timer TRGO, ADC external trigger, and DMA circular buffer with
 half-transfer/complete interrupts for ping-pong streaming. Supports
 1-2 channels (mono/stereo). Key DTS properties: `io-channels`,
 `sample-rate-hz`, `resolution`, `trigger-timer`, `buffer-samples`.
 
-### File system sink (`zstsink-fs`)
+### File system sink (`sink-fs`)
 
 Writes streamed data to files on any Zephyr-supported filesystem (LittleFS,
 FAT, etc.). Rotates to a new file based on configurable thresholds:
@@ -423,12 +423,12 @@ FAT, etc.). Rotates to a new file based on configurable thresholds:
 
 At least one threshold must be non-zero (enforced by `BUILD_ASSERT`).
 Default filenames are `<mount-path>/00000.bin`, `00001.bin`, etc. Override
-with `zstsink_fs_set_filename_handler()` before starting the pipeline.
+with `sink_fs_set_filename_handler()` before starting the pipeline.
 
-### Test nodes (`zstsrc-numgen`, `zstsink-fake`)
+### Test nodes (`src-numgen`, `sink-fake`)
 
-Software-only nodes for testing. `zstsrc-numgen` fills buffers with
-sequential bytes 0-255. `zstsink-fake` discards all received data. No
+Software-only nodes for testing. `src-numgen` fills buffers with
+sequential bytes 0-255. `sink-fake` discards all received data. No
 hardware dependencies; suitable for `native_sim` and unit tests.
 
 ## Kconfig reference
@@ -436,17 +436,17 @@ hardware dependencies; suitable for `native_sim` and unit tests.
 | Symbol | Description | Depends on |
 |--------|------------|-----------|
 | `CONFIG_ZSTREAMER` | Enable the framework | `NET_BUF` (auto-selected) |
-| `CONFIG_ZSTNODE` | Enable the driver subsystem | `ZSTREAMER` |
-| `CONFIG_ZSTNODE_UART_SRC` | UART source driver | `DT_HAS_ZSTREAMER_ZSTSRC_UART_ENABLED`, `SERIAL` |
-| `CONFIG_ZSTNODE_UART_SINK` | UART sink driver | `DT_HAS_ZSTREAMER_ZSTSINK_UART_ENABLED`, `SERIAL` |
-| `CONFIG_ZSTNODE_UART_DMA` | UART DMA/async support | `UART_ASYNC_API` |
-| `CONFIG_ZSTNODE_SPI_SRC` | SPI source driver | `DT_HAS_ZSTREAMER_ZSTSRC_SPI_ENABLED`, `SPI` |
-| `CONFIG_ZSTNODE_SPI_SINK` | SPI sink driver | `DT_HAS_ZSTREAMER_ZSTSINK_SPI_ENABLED`, `SPI` |
-| `CONFIG_ZSTNODE_ADC_SRC` | ADC source driver | `DT_HAS_ZSTREAMER_ZSTSRC_ADC_ENABLED`, `ADC` |
-| `CONFIG_ZSTNODE_ADC_STM32` | STM32 ADC backend | `SOC_FAMILY_STM32`, `DMA` |
-| `CONFIG_ZSTNODE_FS_SINK` | File system sink driver | `DT_HAS_ZSTREAMER_ZSTSINK_FS_ENABLED`, `FILE_SYSTEM` |
-| `CONFIG_ZSTNODE_TEST_NUMGEN_SRC` | Number generator source | `DT_HAS_ZSTREAMER_ZSTSRC_NUMGEN_ENABLED` |
-| `CONFIG_ZSTNODE_TEST_FAKESINK` | Fake sink | `DT_HAS_ZSTREAMER_ZSTSINK_FAKE_ENABLED` |
+| `CONFIG_ZSTREAMER_NODE` | Enable the driver subsystem | `ZSTREAMER` |
+| `CONFIG_ZSTREAMER_NODE_UART_SRC` | UART source driver | `DT_HAS_ZSTREAMER_SRC_UART_ENABLED`, `SERIAL` |
+| `CONFIG_ZSTREAMER_NODE_UART_SINK` | UART sink driver | `DT_HAS_ZSTREAMER_SINK_UART_ENABLED`, `SERIAL` |
+| `CONFIG_ZSTREAMER_NODE_UART_DMA` | UART DMA/async support | `UART_ASYNC_API` |
+| `CONFIG_ZSTREAMER_NODE_SPI_SRC` | SPI source driver | `DT_HAS_ZSTREAMER_SRC_SPI_ENABLED`, `SPI` |
+| `CONFIG_ZSTREAMER_NODE_SPI_SINK` | SPI sink driver | `DT_HAS_ZSTREAMER_SINK_SPI_ENABLED`, `SPI` |
+| `CONFIG_ZSTREAMER_NODE_ADC_SRC` | ADC source driver | `DT_HAS_ZSTREAMER_SRC_ADC_ENABLED`, `ADC` |
+| `CONFIG_ZSTREAMER_NODE_ADC_STM32` | STM32 ADC backend | `SOC_FAMILY_STM32`, `DMA` |
+| `CONFIG_ZSTREAMER_NODE_FS_SINK` | File system sink driver | `DT_HAS_ZSTREAMER_SINK_FS_ENABLED`, `FILE_SYSTEM` |
+| `CONFIG_ZSTREAMER_NODE_TEST_NUMGEN_SRC` | Number generator source | `DT_HAS_ZSTREAMER_SRC_NUMGEN_ENABLED` |
+| `CONFIG_ZSTREAMER_NODE_TEST_FAKESINK` | Fake sink | `DT_HAS_ZSTREAMER_SINK_FAKE_ENABLED` |
 
 All driver Kconfig symbols default to `y` when the corresponding DTS
 compatible is present (`DT_HAS_*_ENABLED`), following the Zephyr convention
@@ -506,28 +506,27 @@ zstreamer/
 ├── zephyr/module.yml                       # Zephyr module descriptor
 ├── west.yml                                # Standalone west manifest
 ├── include/
-│   ├── zstreamer/
-│   │   └── zstreamer.h                     # Framework API (start/stop/submit/alloc)
-│   └── zephyr/drivers/
-│       ├── zstnode.h                       # Driver API, common structs, DT macros
-│       └── zstsink_fs.h                    # FS sink public API (filename callback)
+│   └── zstreamer/
+│       ├── graph.h                          # Graph device types (config, data)
+│       ├── node.h                           # Driver API, common structs, DT macros
+│       └── sink_fs.h                     # FS sink public API (filename callback)
 ├── lib/zstreamer/
 │   ├── zstreamer_graph.c                   # Graph device: NET_BUF_POOL_FIXED per instance
 │   └── zstreamer_node.c                    # Node lifecycle, threads, buffer routing
 ├── dts/bindings/streaming/
-│   ├── zstnode.yaml                        # Base: children phandle array
+│   ├── zstreamer,node.yaml                        # Base: children phandle array
 │   ├── zstreamer,graph.yaml                # Graph: buffer-count, buffer-size
-│   ├── zstreamer,zstsrc.yaml               # Source base: thread-stack-size, priority
-│   ├── zstreamer,zstsink.yaml              # Sink base: thread-stack-size, priority
-│   ├── zstreamer,zstsrc-uart.yaml          # UART source
-│   ├── zstreamer,zstsink-uart.yaml         # UART sink
-│   ├── zstreamer,zstsrc-spi.yaml           # SPI source
-│   ├── zstreamer,zstsink-spi.yaml          # SPI sink
-│   ├── zstreamer,zstsrc-adc.yaml           # ADC source (timer-triggered DMA)
-│   ├── zstreamer,zstsink-fs.yaml           # File system sink
-│   ├── zstreamer,zstsrc-numgen.yaml        # Test: number generator
-│   └── zstreamer,zstsink-fake.yaml         # Test: /dev/null sink
-├── drivers/zstnode/
+│   ├── zstreamer,src.yaml               # Source base: thread-stack-size, priority
+│   ├── zstreamer,sink.yaml              # Sink base: thread-stack-size, priority
+│   ├── zstreamer,src-uart.yaml          # UART source
+│   ├── zstreamer,sink-uart.yaml         # UART sink
+│   ├── zstreamer,src-spi.yaml           # SPI source
+│   ├── zstreamer,sink-spi.yaml          # SPI sink
+│   ├── zstreamer,src-adc.yaml           # ADC source (timer-triggered DMA)
+│   ├── zstreamer,sink-fs.yaml           # File system sink
+│   ├── zstreamer,src-numgen.yaml        # Test: number generator
+│   └── zstreamer,sink-fake.yaml         # Test: /dev/null sink
+├── drivers/zstreamer/
 │   ├── uart/                               # UART src + sink + DMA context
 │   ├── spi/                                # SPI src + sink (async probe)
 │   ├── adc/                                # ADC src (STM32 timer+DMA backend)
@@ -539,8 +538,8 @@ zstreamer/
 │   ├── adc2fakesink/                       # ADC capture to fake sink
 │   └── numgen2fakesink/                    # Software-only test pipeline
 └── tests/
-    ├── drivers/zstnode/                    # UART node ztest suite
-    └── drivers/zstnode_spi/                # SPI node ztest suite
+    ├── drivers/zstreamer/                    # UART node ztest suite
+    └── drivers/node_spi/                # SPI node ztest suite
 ```
 
 ## License

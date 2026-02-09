@@ -7,7 +7,7 @@
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
 
-#include <zstreamer/zstnode.h>
+#include <zstreamer/node.h>
 
 LOG_MODULE_REGISTER(uart2uart, LOG_LEVEL_INF);
 
@@ -23,7 +23,7 @@ int main(void)
 		return -ENODEV;
 	}
 
-	ret = zstnode_start(src);
+	ret = zstreamer_node_start(src);
 	if (ret) {
 		LOG_ERR("failed to start pipeline: %d", ret);
 		return ret;
