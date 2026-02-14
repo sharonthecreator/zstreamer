@@ -17,13 +17,13 @@
 
 #include <zstreamer/node.h>
 
-#if defined(CONFIG_ZSTREAMER_NODE_ADC_STM32)
+#if defined(CONFIG_ZSTREAMER_ADC_STM32)
 #include "src_adc_stm32.h"
 #endif
 
-LOG_MODULE_REGISTER(src_adc, CONFIG_ZSTREAMER_NODE_LOG_LEVEL);
+LOG_MODULE_REGISTER(src_adc, CONFIG_ZSTREAMER_LOG_LEVEL);
 
-#define DT_DRV_COMPAT zstreamer_src_adc
+#define DT_DRV_COMPAT zstreamer_adc_src
 
 /*
  * ============================================================================
@@ -55,7 +55,7 @@ struct src_adc_data {
 	struct zstreamer_node_data common;
 
 	/* Platform-specific state */
-#if defined(CONFIG_ZSTREAMER_NODE_ADC_STM32)
+#if defined(CONFIG_ZSTREAMER_ADC_STM32)
 	struct src_adc_stm32_data stm32;
 #endif
 
@@ -123,7 +123,7 @@ static int src_adc_init(const struct device *dev)
 		return -EINVAL;
 	}
 
-#if defined(CONFIG_ZSTREAMER_NODE_ADC_STM32)
+#if defined(CONFIG_ZSTREAMER_ADC_STM32)
 	/* Configure STM32-specific ADC capture */
 	struct src_adc_stm32_config stm32_cfg = {
 		.adc_dev = cfg->adc_dev,
@@ -163,7 +163,7 @@ static int src_adc_open(const struct device *dev)
 	struct src_adc_data *data = dev->data;
 	int ret;
 
-#if defined(CONFIG_ZSTREAMER_NODE_ADC_STM32)
+#if defined(CONFIG_ZSTREAMER_ADC_STM32)
 	ret = src_adc_stm32_start(&data->stm32);
 #else
 	ret = -ENOTSUP;
@@ -184,7 +184,7 @@ static int src_adc_close(const struct device *dev)
 	struct src_adc_data *data = dev->data;
 	int ret;
 
-#if defined(CONFIG_ZSTREAMER_NODE_ADC_STM32)
+#if defined(CONFIG_ZSTREAMER_ADC_STM32)
 	ret = src_adc_stm32_stop(&data->stm32);
 #else
 	ret = -ENOTSUP;

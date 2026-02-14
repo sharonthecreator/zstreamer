@@ -9,7 +9,7 @@ description: |
   child of an SPI bus controller. SPI bus parameters (frequency,
   cpol, cpha, chip-select) are taken from that device node.
 
-compatible: "zstreamer,src-spi"
+compatible: "zstreamer,spi-src"
 
 include: zstreamer,src.yaml
 

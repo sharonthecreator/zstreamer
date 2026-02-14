@@ -12,8 +12,8 @@
  * sink-uart (TX) can use async/DMA on the same UART.
  */
 
-#ifndef ZSTREAMER_NODE_UART_DMA_CONTEXT_H_
-#define ZSTREAMER_NODE_UART_DMA_CONTEXT_H_
+#ifndef ZSTREAMER_UART_DMA_CONTEXT_H_
+#define ZSTREAMER_UART_DMA_CONTEXT_H_
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
@@ -120,4 +120,4 @@ int uart_dma_context_tx(const struct device *uart_dev, const uint8_t *data,
 }
 #endif
 
-#endif /* ZSTREAMER_NODE_UART_DMA_CONTEXT_H_ */
+#endif /* ZSTREAMER_UART_DMA_CONTEXT_H_ */

@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT zstreamer_sink_fake
+#define DT_DRV_COMPAT zstreamer_fake_sink
 
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
 
 #include <zstreamer/node.h>
 
-LOG_MODULE_REGISTER(sink_fake, CONFIG_ZSTREAMER_NODE_LOG_LEVEL);
+LOG_MODULE_REGISTER(sink_fake, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 struct sink_fake_config {
 	struct zstreamer_node_config common;

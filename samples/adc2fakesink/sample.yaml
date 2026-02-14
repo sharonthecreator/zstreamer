@@ -5,7 +5,7 @@ sample:
   name: ADC-to-FakeSink
   description: |
     Captures ADC samples using timer-triggered DMA and discards them
-    using a zstreamer graph with src-adc and sink-fake nodes.
+    using a zstreamer graph with adc-src and fake-sink nodes.
     Demonstrates audio/signal capture at precise sample rates.
 tests:
   sample.zstreamer.adc2fakesink:

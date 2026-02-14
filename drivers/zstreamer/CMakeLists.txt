@@ -3,22 +3,8 @@
 
 zephyr_include_directories(${ZEPHYR_ZSTREAMER_MODULE_DIR}/include)
 
-if(CONFIG_ZSTREAMER_NODE_UART_SRC OR CONFIG_ZSTREAMER_NODE_UART_SINK)
-  add_subdirectory(uart)
-endif()
-
-if(CONFIG_ZSTREAMER_NODE_SPI_SRC OR CONFIG_ZSTREAMER_NODE_SPI_SINK)
-  add_subdirectory(spi)
-endif()
-
-if(CONFIG_ZSTREAMER_NODE_ADC_SRC)
-  add_subdirectory(adc)
-endif()
-
-if(CONFIG_ZSTREAMER_NODE_FS_SINK)
-  add_subdirectory(fs)
-endif()
-
-if(CONFIG_ZSTREAMER_NODE_TEST_NUMGEN_SRC OR CONFIG_ZSTREAMER_NODE_TEST_FAKESINK)
-  add_subdirectory(test)
-endif()
+add_subdirectory_ifdef(CONFIG_ZSTREAMER_UART uart)
+add_subdirectory_ifdef(CONFIG_ZSTREAMER_SPI spi)
+add_subdirectory_ifdef(CONFIG_ZSTREAMER_ADC adc)
+add_subdirectory_ifdef(CONFIG_ZSTREAMER_FS fs)
+add_subdirectory_ifdef(CONFIG_ZSTREAMER_TEST test)

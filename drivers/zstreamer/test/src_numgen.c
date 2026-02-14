@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT zstreamer_src_numgen
+#define DT_DRV_COMPAT zstreamer_numgen_src
 
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
 
 #include <zstreamer/node.h>
 
-LOG_MODULE_REGISTER(src_numgen, CONFIG_ZSTREAMER_NODE_LOG_LEVEL);
+LOG_MODULE_REGISTER(src_numgen, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 struct src_numgen_config {
 	struct zstreamer_node_config common;

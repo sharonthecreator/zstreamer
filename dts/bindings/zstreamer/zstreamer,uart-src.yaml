@@ -5,7 +5,7 @@ description: |
   UART source node. Reads bytes from a UART device using poll_in
   and submits them as buffers to downstream children.
 
-compatible: "zstreamer,src-uart"
+compatible: "zstreamer,uart-src"
 
 include: zstreamer,src.yaml
 

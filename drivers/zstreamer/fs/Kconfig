@@ -1,12 +1,15 @@
 # Copyright (c) 2026 sharonthecreator
 # SPDX-License-Identifier: Apache-2.0
 
-config ZSTREAMER_NODE_FS_SINK
-	bool "File system sink zstreamer_node driver"
-	default y
-	depends on DT_HAS_ZSTREAMER_SINK_FS_ENABLED
-	depends on ZSTREAMER_NODE
+config ZSTREAMER_FS
+	bool
+
+config ZSTREAMER_FS_SINK
+	bool "File system sink driver"
+	depends on DT_HAS_ZSTREAMER_FS_SINK_ENABLED
+	depends on ZSTREAMER
 	depends on FILE_SYSTEM
+	select ZSTREAMER_FS
 	help
 	  Enable the file system sink streaming node driver.
 	  Writes streamed data to files, rotating based on time or size.

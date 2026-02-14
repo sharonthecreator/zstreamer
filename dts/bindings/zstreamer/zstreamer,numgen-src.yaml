@@ -5,6 +5,6 @@ description: |
   Number generator source node. Produces sequential bytes 0-255
   (wrapping) to fill each buffer completely. Software-only test node.
 
-compatible: "zstreamer,src-numgen"
+compatible: "zstreamer,numgen-src"
 
 include: zstreamer,src.yaml

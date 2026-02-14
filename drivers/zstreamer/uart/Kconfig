@@ -1,51 +1,54 @@
 # Copyright (c) 2026 sharonthecreator
 # SPDX-License-Identifier: Apache-2.0
 
-config ZSTREAMER_NODE_UART_SRC
-	bool "UART source zstreamer_node driver"
-	default y
-	depends on DT_HAS_ZSTREAMER_SRC_UART_ENABLED
-	depends on ZSTREAMER_NODE
+config ZSTREAMER_UART
+	bool
+
+config ZSTREAMER_UART_SRC
+	bool "UART source driver"
+	depends on DT_HAS_ZSTREAMER_UART_SRC_ENABLED
+	depends on ZSTREAMER
 	depends on SERIAL
+	select ZSTREAMER_UART
 	help
 	  Enable the UART source streaming node driver.
 	  Reads bytes from a UART device and submits them
 	  as buffers into the streaming graph.
 
-config ZSTREAMER_NODE_UART_SINK
-	bool "UART sink zstreamer_node driver"
-	default y
-	depends on DT_HAS_ZSTREAMER_SINK_UART_ENABLED
-	depends on ZSTREAMER_NODE
+config ZSTREAMER_UART_SINK
+	bool "UART sink driver"
+	depends on DT_HAS_ZSTREAMER_UART_SINK_ENABLED
+	depends on ZSTREAMER
 	depends on SERIAL
+	select ZSTREAMER_UART
 	help
 	  Enable the UART sink streaming node driver.
 	  Writes received buffer data to a UART device.
 
-config ZSTREAMER_NODE_UART_DMA
-	bool "UART DMA/async support for zstreamer_node"
+config ZSTREAMER_UART_DMA
+	bool "UART DMA/async support"
 	default y
 	depends on UART_ASYNC_API
-	depends on (ZSTREAMER_NODE_UART_SRC || ZSTREAMER_NODE_UART_SINK)
+	depends on (ZSTREAMER_UART_SRC || ZSTREAMER_UART_SINK)
 	help
-	  Enable DMA/async UART support for zstreamer_node drivers.
+	  Enable DMA/async UART support for zstreamer drivers.
 	  When enabled, UART source and sink nodes will automatically
 	  use DMA transfers when available, falling back to polling
 	  if the UART device doesn't support async API.
 
-config ZSTREAMER_NODE_UART_DMA_MAX_CONTEXTS
+config ZSTREAMER_UART_DMA_MAX_CONTEXTS
 	int "Maximum number of UART DMA contexts"
 	default 4
-	depends on ZSTREAMER_NODE_UART_DMA
+	depends on ZSTREAMER_UART_DMA
 	help
 	  Maximum number of UART devices that can simultaneously use
 	  DMA with the shared context system. Each UART device that
 	  has both a source and sink node sharing DMA uses one context.
 
-config ZSTREAMER_NODE_UART_DMA_RX_BUF_SIZE
+config ZSTREAMER_UART_DMA_RX_BUF_SIZE
 	int "UART DMA RX buffer size"
 	default 256
-	depends on ZSTREAMER_NODE_UART_DMA
+	depends on ZSTREAMER_UART_DMA
 	help
 	  Size in bytes of the DMA receive buffer for UART source nodes.
 	  Larger buffers can reduce interrupt overhead but use more RAM.

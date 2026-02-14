@@ -30,7 +30,7 @@
 		buffer-size = <1024>;
 
 		spi_source: spi-source {
-			compatible = "zstreamer,src-spi";
+			compatible = "zstreamer,spi-src";
 			spi-device = <&spi_test_rx>;
 			children = <&spi_sinker>;
 			rx-length = <64>;
@@ -39,7 +39,7 @@
 		};
 
 		spi_sinker: spi-sinker {
-			compatible = "zstreamer,sink-spi";
+			compatible = "zstreamer,spi-sink";
 			spi-device = <&spi_test_tx>;
 			thread-stack-size = <1024>;
 			thread-priority = <5>;

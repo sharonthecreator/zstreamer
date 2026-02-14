@@ -1,20 +1,23 @@
 # Copyright (c) 2026 sharonthecreator
 # SPDX-License-Identifier: Apache-2.0
 
-config ZSTREAMER_NODE_ADC_SRC
-	bool "ADC source zstreamer_node driver"
-	default y
-	depends on DT_HAS_ZSTREAMER_SRC_ADC_ENABLED
-	depends on ZSTREAMER_NODE
+config ZSTREAMER_ADC
+	bool
+
+config ZSTREAMER_ADC_SRC
+	bool "ADC source driver"
+	depends on DT_HAS_ZSTREAMER_ADC_SRC_ENABLED
+	depends on ZSTREAMER
 	depends on ADC
+	select ZSTREAMER_ADC
 	help
 	  Enable the ADC source streaming node driver.
 	  This driver captures ADC samples using timer-triggered DMA
 	  for precise sample rates, suitable for audio capture.
 
-if ZSTREAMER_NODE_ADC_SRC
+if ZSTREAMER_ADC_SRC
 
-config ZSTREAMER_NODE_ADC_STM32
+config ZSTREAMER_ADC_STM32
 	bool "STM32-specific ADC implementation"
 	default y
 	depends on SOC_FAMILY_STM32
@@ -26,14 +29,14 @@ config ZSTREAMER_NODE_ADC_STM32
 	  with DMA. This provides hardware-level integration between
 	  timer TRGO and ADC external trigger for precise sampling.
 
-config ZSTREAMER_NODE_ADC_DMA_BUFFER_NOCACHE
+config ZSTREAMER_ADC_DMA_BUFFER_NOCACHE
 	bool "Place ADC DMA buffer in non-cacheable region"
 	default y
-	depends on ZSTREAMER_NODE_ADC_STM32
+	depends on ZSTREAMER_ADC_STM32
 	depends on CPU_HAS_DCACHE
 	help
 	  On MCUs with data cache (e.g., STM32U5, STM32H7), DMA buffers
 	  must be in non-cacheable memory. Enable this to allocate the
 	  ADC DMA buffer in SRAM4 or another non-cacheable region.
 
-endif # ZSTREAMER_NODE_ADC_SRC
+endif # ZSTREAMER_ADC_SRC

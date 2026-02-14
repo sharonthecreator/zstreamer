@@ -59,7 +59,7 @@
 		buffer-size = <1024>;
 
 		adc_source: adc-source {
-			compatible = "zstreamer,src-adc";
+			compatible = "zstreamer,adc-src";
 			io-channels = <&adc1 0>, <&adc1 1>;
 			sample-rate-hz = <48000>;
 			resolution = <12>;
@@ -72,7 +72,7 @@
 		};
 
 		fake_sinker: fake-sinker {
-			compatible = "zstreamer,sink-fake";
+			compatible = "zstreamer,fake-sink";
 			thread-stack-size = <1024>;
 			thread-priority = <5>;
 		};

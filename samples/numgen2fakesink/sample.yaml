@@ -4,8 +4,8 @@
 sample:
   name: Number generator to fake sink
   description: |
-    Demonstrates a software-only streaming pipeline using src-numgen
-    (generates sequential bytes 0-255) piped to sink-fake (discards data).
+    Demonstrates a software-only streaming pipeline using numgen-src
+    (generates sequential bytes 0-255) piped to fake-sink (discards data).
 tests:
   sample.zstreamer.numgen2fakesink:
     tags: zstreamer

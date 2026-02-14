@@ -5,7 +5,7 @@ sample:
   name: SPI-to-SPI relay
   description: |
     Reads data from one SPI bus and writes it to another using a
-    zstreamer graph with src-spi and sink-spi nodes.
+    zstreamer graph with spi-src and spi-sink nodes.
 tests:
   sample.zstreamer.spi2spi:
     tags: zstreamer spi

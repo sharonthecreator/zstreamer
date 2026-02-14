@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT zstreamer_src_uart
+#define DT_DRV_COMPAT zstreamer_uart_src
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
@@ -15,11 +15,11 @@
 #include "uart_dma_context.h"
 #endif
 
-LOG_MODULE_REGISTER(src_uart, CONFIG_ZSTREAMER_NODE_LOG_LEVEL);
+LOG_MODULE_REGISTER(src_uart, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 #if defined(CONFIG_UART_ASYNC_API)
-#ifndef CONFIG_ZSTREAMER_NODE_UART_DMA_RX_BUF_SIZE
-#define CONFIG_ZSTREAMER_NODE_UART_DMA_RX_BUF_SIZE 256
+#ifndef CONFIG_ZSTREAMER_UART_DMA_RX_BUF_SIZE
+#define CONFIG_ZSTREAMER_UART_DMA_RX_BUF_SIZE 256
 #endif
 #endif
 
@@ -31,7 +31,7 @@ struct src_uart_config {
 struct src_uart_data {
 	struct zstreamer_node_data common;
 #if defined(CONFIG_UART_ASYNC_API)
-	uint8_t dma_rx_buf[CONFIG_ZSTREAMER_NODE_UART_DMA_RX_BUF_SIZE];
+	uint8_t dma_rx_buf[CONFIG_ZSTREAMER_UART_DMA_RX_BUF_SIZE];
 	struct k_sem rx_sem;
 	const uint8_t *rx_data;
 	size_t rx_len;

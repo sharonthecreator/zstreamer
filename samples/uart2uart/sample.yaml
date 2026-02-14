@@ -5,7 +5,7 @@ sample:
   name: UART-to-UART relay
   description: |
     Relays bytes received on one UART to another using a
-    zstreamer graph with src-uart and sink-uart nodes.
+    zstreamer graph with uart-src and uart-sink nodes.
 tests:
   sample.zstreamer.uart2uart:
     tags: zstreamer uart

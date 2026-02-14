@@ -7,16 +7,16 @@
 	uart_src: uart-emul-src {
 		compatible = "zephyr,uart-emul";
 		current-speed = <115200>;
-		rx-fifo-size = <32768>;
-		tx-fifo-size = <32768>;
+		rx-fifo-size = <16384>;
+		tx-fifo-size = <16384>;
 		status = "okay";
 	};
 
 	uart_sink: uart-emul-sink {
 		compatible = "zephyr,uart-emul";
 		current-speed = <115200>;
-		rx-fifo-size = <32768>;
-		tx-fifo-size = <32768>;
+		rx-fifo-size = <16384>;
+		tx-fifo-size = <16384>;
 		status = "okay";
 	};
 
@@ -26,31 +26,31 @@
 		buffer-size = <1024>;
 
 		uart_source: uart-source {
-			compatible = "zstreamer,src-uart";
+			compatible = "zstreamer,uart-src";
 			uart-device = <&uart_src>;
 			children = <&uart_sinker>;
-			thread-stack-size = <1024>;
+			thread-stack-size = <2048>;
 			thread-priority = <5>;
 		};
 
 		uart_sinker: uart-sinker {
-			compatible = "zstreamer,sink-uart";
+			compatible = "zstreamer,uart-sink";
 			uart-device = <&uart_sink>;
-			thread-stack-size = <1024>;
+			thread-stack-size = <2048>;
 			thread-priority = <5>;
 		};
 
 		numgen_source: numgen-source {
-			compatible = "zstreamer,src-numgen";
+			compatible = "zstreamer,numgen-src";
 			children = <&fake_sinker>;
-			thread-stack-size = <1024>;
-			thread-priority = <5>;
+			thread-stack-size = <2048>;
+			thread-priority = <10>;
 		};
 
 		fake_sinker: fake-sinker {
-			compatible = "zstreamer,sink-fake";
-			thread-stack-size = <1024>;
-			thread-priority = <5>;
+			compatible = "zstreamer,fake-sink";
+			thread-stack-size = <2048>;
+			thread-priority = <10>;
 		};
 	};
 };

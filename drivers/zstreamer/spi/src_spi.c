@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT zstreamer_src_spi
+#define DT_DRV_COMPAT zstreamer_spi_src
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
@@ -11,10 +11,10 @@
 
 #include <zstreamer/node.h>
 
-LOG_MODULE_REGISTER(src_spi, CONFIG_ZSTREAMER_NODE_LOG_LEVEL);
+LOG_MODULE_REGISTER(src_spi, CONFIG_ZSTREAMER_LOG_LEVEL);
 
-#ifndef CONFIG_ZSTREAMER_NODE_SPI_DMA_RX_BUF_SIZE
-#define CONFIG_ZSTREAMER_NODE_SPI_DMA_RX_BUF_SIZE 256
+#ifndef CONFIG_ZSTREAMER_SPI_DMA_RX_BUF_SIZE
+#define CONFIG_ZSTREAMER_SPI_DMA_RX_BUF_SIZE 256
 #endif
 
 struct src_spi_config {
@@ -26,7 +26,7 @@ struct src_spi_config {
 struct src_spi_data {
 	struct zstreamer_node_data common;
 #if defined(CONFIG_SPI_ASYNC)
-	uint8_t dma_rx_buf[CONFIG_ZSTREAMER_NODE_SPI_DMA_RX_BUF_SIZE];
+	uint8_t dma_rx_buf[CONFIG_ZSTREAMER_SPI_DMA_RX_BUF_SIZE];
 	struct k_poll_signal sig;
 	struct k_poll_event evt;
 	bool async_enabled;

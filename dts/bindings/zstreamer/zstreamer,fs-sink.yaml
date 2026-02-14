@@ -5,7 +5,7 @@ description: |
   File system sink node. Writes received buffer data to files,
   rotating based on time or size thresholds.
 
-compatible: "zstreamer,sink-fs"
+compatible: "zstreamer,fs-sink"
 
 include: zstreamer,sink.yaml
 

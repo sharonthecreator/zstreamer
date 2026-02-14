@@ -44,13 +44,13 @@
 		buffer-size = <128>;
 
 		uart_source: uart-source {
-			compatible = "zstreamer,src-uart";
+			compatible = "zstreamer,uart-src";
 			uart-device = <&usart2>;
 			children = <&uart_sinker>;
 		};
 
 		uart_sinker: uart-sinker {
-			compatible = "zstreamer,sink-uart";
+			compatible = "zstreamer,uart-sink";
 			uart-device = <&usart3>;
 		};
 	};

@@ -31,7 +31,7 @@
 
 #include "src_adc_stm32.h"
 
-LOG_MODULE_REGISTER(src_adc_stm32, CONFIG_ZSTREAMER_NODE_LOG_LEVEL);
+LOG_MODULE_REGISTER(src_adc_stm32, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 /*
  * ============================================================================
@@ -166,16 +166,16 @@ static uint32_t get_timer_clock(TIM_TypeDef *timer)
  * ============================================================================
  */
 
-#if defined(CONFIG_ZSTREAMER_NODE_ADC_DMA_BUFFER_NOCACHE)
+#if defined(CONFIG_ZSTREAMER_ADC_DMA_BUFFER_NOCACHE)
 /* Place buffer in non-cacheable SRAM4 for STM32U5 */
 static uint16_t __aligned(4) __attribute__((section(".nocache")))
-	dma_buffer_storage[CONFIG_ZSTREAMER_NODE_ADC_SRC ? 2048 : 1];
+	dma_buffer_storage[CONFIG_ZSTREAMER_ADC_SRC ? 2048 : 1];
 static bool dma_buffer_in_use;
 #endif
 
 static void *allocate_dma_buffer(size_t size_bytes)
 {
-#if defined(CONFIG_ZSTREAMER_NODE_ADC_DMA_BUFFER_NOCACHE)
+#if defined(CONFIG_ZSTREAMER_ADC_DMA_BUFFER_NOCACHE)
 	if (dma_buffer_in_use || size_bytes > sizeof(dma_buffer_storage)) {
 		LOG_ERR("DMA buffer allocation failed: in_use=%d, size=%zu, max=%zu",
 			dma_buffer_in_use, size_bytes, sizeof(dma_buffer_storage));
@@ -190,7 +190,7 @@ static void *allocate_dma_buffer(size_t size_bytes)
 
 static void free_dma_buffer(void *buffer)
 {
-#if defined(CONFIG_ZSTREAMER_NODE_ADC_DMA_BUFFER_NOCACHE)
+#if defined(CONFIG_ZSTREAMER_ADC_DMA_BUFFER_NOCACHE)
 	if (buffer == dma_buffer_storage) {
 		dma_buffer_in_use = false;
 	}

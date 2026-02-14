@@ -5,7 +5,7 @@ description: |
   UART sink node. Writes received buffer data to a UART device
   using poll_out.
 
-compatible: "zstreamer,sink-uart"
+compatible: "zstreamer,uart-sink"
 
 include: zstreamer,sink.yaml
 

@@ -6,10 +6,10 @@
 #include <zephyr/logging/log.h>
 #include "uart_dma_context.h"
 
-LOG_MODULE_REGISTER(uart_dma_context, CONFIG_ZSTREAMER_NODE_LOG_LEVEL);
+LOG_MODULE_REGISTER(uart_dma_context, CONFIG_ZSTREAMER_LOG_LEVEL);
 
-#ifndef CONFIG_ZSTREAMER_NODE_UART_DMA_MAX_CONTEXTS
-#define CONFIG_ZSTREAMER_NODE_UART_DMA_MAX_CONTEXTS 4
+#ifndef CONFIG_ZSTREAMER_UART_DMA_MAX_CONTEXTS
+#define CONFIG_ZSTREAMER_UART_DMA_MAX_CONTEXTS 4
 #endif
 
 struct uart_dma_context {
@@ -28,7 +28,7 @@ struct uart_dma_context {
 	void *tx_user_data;
 };
 
-static struct uart_dma_context contexts[CONFIG_ZSTREAMER_NODE_UART_DMA_MAX_CONTEXTS];
+static struct uart_dma_context contexts[CONFIG_ZSTREAMER_UART_DMA_MAX_CONTEXTS];
 static struct k_spinlock lock;
 
 /**
@@ -40,7 +40,7 @@ static struct uart_dma_context *find_or_create_context(
 {
 	struct uart_dma_context *free_slot = NULL;
 
-	for (int i = 0; i < CONFIG_ZSTREAMER_NODE_UART_DMA_MAX_CONTEXTS; i++) {
+	for (int i = 0; i < CONFIG_ZSTREAMER_UART_DMA_MAX_CONTEXTS; i++) {
 		if (contexts[i].uart_dev == uart_dev) {
 			return &contexts[i];
 		}
@@ -62,7 +62,7 @@ static struct uart_dma_context *find_or_create_context(
  */
 static struct uart_dma_context *find_context(const struct device *uart_dev)
 {
-	for (int i = 0; i < CONFIG_ZSTREAMER_NODE_UART_DMA_MAX_CONTEXTS; i++) {
+	for (int i = 0; i < CONFIG_ZSTREAMER_UART_DMA_MAX_CONTEXTS; i++) {
 		if (contexts[i].uart_dev == uart_dev) {
 			return &contexts[i];
 		}

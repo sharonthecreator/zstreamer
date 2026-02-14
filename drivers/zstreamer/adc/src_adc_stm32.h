@@ -8,8 +8,8 @@
  * audio/signal capture at precise sample rates.
  */
 
-#ifndef ZSTREAMER_NODE_SRC_ADC_STM32_H_
-#define ZSTREAMER_NODE_SRC_ADC_STM32_H_
+#ifndef ZSTREAMER_ADC_SRC_STM32_H_
+#define ZSTREAMER_ADC_SRC_STM32_H_
 
 #include <zephyr/device.h>
 #include <stdint.h>
@@ -134,4 +134,4 @@ void src_adc_stm32_deinit(struct src_adc_stm32_data *data);
 }
 #endif
 
-#endif /* ZSTREAMER_NODE_SRC_ADC_STM32_H_ */
+#endif /* ZSTREAMER_ADC_SRC_STM32_H_ */

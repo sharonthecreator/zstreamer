@@ -26,7 +26,7 @@
 		buffer-size = <128>;
 
 		spi_source: spi-source {
-			compatible = "zstreamer,src-spi";
+			compatible = "zstreamer,spi-src";
 			spi-device = <&spi_src>;
 			spi-max-frequency = <1000000>;
 			rx-length = <64>;
@@ -34,7 +34,7 @@
 		};
 
 		spi_sinker: spi-sinker {
-			compatible = "zstreamer,sink-spi";
+			compatible = "zstreamer,spi-sink";
 			spi-device = <&spi_sink>;
 			spi-max-frequency = <1000000>;
 		};

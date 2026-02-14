@@ -4,7 +4,7 @@
  *
  * SPI zstreamer node driver tests.
  *
- * Tests the src-spi (source) and sink-spi (sink) drivers
+ * Tests the spi-src (source) and spi-sink (sink) drivers
  * using the SPI emulator on native_sim. Only the polling path
  * is exercised because the SPI emulator does not support async.
  */
@@ -248,6 +248,72 @@ static inline uint8_t pattern_byte(uint32_t pos)
 	return (uint8_t)((pos * 131u + 17u) & 0xffu);
 }
 
+static void run_large_spi_transfer(uint32_t total, uint32_t chunk)
+{
+	static uint8_t tx_buf[2048];
+	static uint8_t rx_buf[2048];
+	uint32_t tx_pos = 0;
+	uint32_t rx_pos = 0;
+	int ret;
+
+	ret = zstreamer_node_start(src_dev);
+	zassert_equal(ret, 0, "src start");
+
+	while (tx_pos < total || rx_pos < total) {
+		if (tx_pos < total) {
+			uint32_t want = chunk;
+
+			if (want > sizeof(tx_buf)) {
+				want = sizeof(tx_buf);
+			}
+			if (want > total - tx_pos) {
+				want = total - tx_pos;
+			}
+
+			for (uint32_t i = 0; i < want; i++) {
+				tx_buf[i] = pattern_byte(tx_pos + i);
+			}
+
+			tx_pos += spi_test_put_rx_data(spi_rx_dev, tx_buf, want);
+		}
+
+		k_msleep(1);
+
+		for (;;) {
+			uint32_t want = sizeof(rx_buf);
+			uint32_t got;
+
+			if (want > total - rx_pos) {
+				want = total - rx_pos;
+			}
+			if (want == 0) {
+				break;
+			}
+
+			got = spi_test_get_tx_data(spi_tx_dev, rx_buf, want);
+			if (got == 0) {
+				break;
+			}
+
+			for (uint32_t i = 0; i < got; i++) {
+				uint8_t exp = pattern_byte(rx_pos + i);
+
+				zassert_equal(
+					rx_buf[i], exp,
+					"mismatch at byte %u: 0x%02x != 0x%02x",
+					rx_pos + i, rx_buf[i], exp);
+			}
+			rx_pos += got;
+		}
+	}
+
+	ret = zstreamer_node_stop(src_dev);
+	zassert_equal(ret, 0, "src stop");
+
+	zassert_equal(rx_pos, total,
+		      "total mismatch: expected %u, got %u", total, rx_pos);
+}
+
 ZTEST(zstreamer_node_spi, test_spi_large_verified)
 {
 	/*
@@ -284,4 +350,81 @@ ZTEST(zstreamer_node_spi, test_spi_large_verified)
 			      "mismatch at byte %u: 0x%02x != 0x%02x",
 			      (unsigned)i, rx_data[i], tx_data[i]);
 	}
+}
+
+ZTEST(zstreamer_node_spi, test_spi_64kb_streamed)
+{
+	/* 64 KiB end-to-end with continuous feed and drain. */
+	run_large_spi_transfer(64u * 1024u, 1536u);
+}
+
+ZTEST(zstreamer_node_spi, test_spi_96kb_varied_chunks)
+{
+	/* 96 KiB with mixed chunk sizes (all >= 64-byte SPI frame). */
+	static const uint16_t chunks[] = {64, 137, 511, 1024, 2048, 777, 1536};
+	const uint32_t total = 96u * 1024u;
+	uint32_t tx_pos = 0;
+	uint32_t rx_pos = 0;
+	uint32_t ci = 0;
+	static uint8_t tx_buf[2048];
+	static uint8_t rx_buf[2048];
+	int ret;
+
+	ret = zstreamer_node_start(src_dev);
+	zassert_equal(ret, 0, "src start");
+
+	while (tx_pos < total || rx_pos < total) {
+		if (tx_pos < total) {
+			uint32_t want = chunks[ci % ARRAY_SIZE(chunks)];
+
+			ci++;
+			if (want > sizeof(tx_buf)) {
+				want = sizeof(tx_buf);
+			}
+			if (want > total - tx_pos) {
+				want = total - tx_pos;
+			}
+
+			for (uint32_t i = 0; i < want; i++) {
+				tx_buf[i] = pattern_byte(tx_pos + i);
+			}
+
+			tx_pos += spi_test_put_rx_data(spi_rx_dev, tx_buf, want);
+		}
+
+		k_msleep(1);
+
+		for (;;) {
+			uint32_t want = sizeof(rx_buf);
+			uint32_t got;
+
+			if (want > total - rx_pos) {
+				want = total - rx_pos;
+			}
+			if (want == 0) {
+				break;
+			}
+
+			got = spi_test_get_tx_data(spi_tx_dev, rx_buf, want);
+			if (got == 0) {
+				break;
+			}
+
+			for (uint32_t i = 0; i < got; i++) {
+				uint8_t exp = pattern_byte(rx_pos + i);
+
+				zassert_equal(
+					rx_buf[i], exp,
+					"mismatch at byte %u: 0x%02x != 0x%02x",
+					rx_pos + i, rx_buf[i], exp);
+			}
+			rx_pos += got;
+		}
+	}
+
+	ret = zstreamer_node_stop(src_dev);
+	zassert_equal(ret, 0, "src stop");
+
+	zassert_equal(rx_pos, total,
+		      "total mismatch: expected %u, got %u", total, rx_pos);
 }

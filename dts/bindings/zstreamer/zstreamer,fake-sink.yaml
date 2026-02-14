@@ -5,6 +5,6 @@ description: |
   Fake sink node. Discards all received buffer data.
   Software-only test node.
 
-compatible: "zstreamer,sink-fake"
+compatible: "zstreamer,fake-sink"
 
 include: zstreamer,sink.yaml

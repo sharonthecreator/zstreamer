@@ -249,8 +249,10 @@ int zstreamer_node_stop(const struct device *dev)
 		return -EALREADY;
 	}
 
-	/* Wait for the source thread to become idle. */
-	k_sem_take(&data->idle_sem, K_FOREVER);
+	/* Avoid hanging forever if a source thread misses idle signaling. */
+	if (k_sem_take(&data->idle_sem, K_SECONDS(5)) != 0) {
+		LOG_WRN("[%s] stop timeout waiting for idle", dev->name);
+	}
 
 	drain_fifo(&data->fifo);
 

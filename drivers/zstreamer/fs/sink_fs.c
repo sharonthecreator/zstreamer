@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT zstreamer_sink_fs
+#define DT_DRV_COMPAT zstreamer_fs_sink
 
 #include <zephyr/device.h>
 #include <zephyr/fs/fs.h>
@@ -15,7 +15,7 @@
 #include <zstreamer/node.h>
 #include <zstreamer/sink_fs.h>
 
-LOG_MODULE_REGISTER(sink_fs, CONFIG_ZSTREAMER_NODE_LOG_LEVEL);
+LOG_MODULE_REGISTER(sink_fs, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 struct sink_fs_config {
 	struct zstreamer_node_config common;

@@ -13,9 +13,8 @@ description: |
 
   Example for STM32U5 at 48kHz stereo:
 
-    adc_source: adc-source@0 {
-        compatible = "zstreamer,src-adc";
-        reg = <0>;
+    adc_source: adc-source {
+        compatible = "zstreamer,adc-src";
         io-channels = <&adc1 0>, <&adc1 1>;
         sample-rate-hz = <48000>;
         resolution = <12>;
@@ -24,7 +23,7 @@ description: |
         children = <&some_sink>;
     };
 
-compatible: "zstreamer,src-adc"
+compatible: "zstreamer,adc-src"
 
 include: zstreamer,src.yaml
 

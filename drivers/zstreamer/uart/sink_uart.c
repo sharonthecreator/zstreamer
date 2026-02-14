@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT zstreamer_sink_uart
+#define DT_DRV_COMPAT zstreamer_uart_sink
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
@@ -15,7 +15,7 @@
 #include "uart_dma_context.h"
 #endif
 
-LOG_MODULE_REGISTER(sink_uart, CONFIG_ZSTREAMER_NODE_LOG_LEVEL);
+LOG_MODULE_REGISTER(sink_uart, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 struct sink_uart_config {
 	struct zstreamer_node_config common;
