@@ -12,20 +12,20 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net_buf.h>
 
-#include <zstreamer/node.h>
+#include <zstreamer/sink.h>
 #include <zstreamer/sink_fs.h>
 
 LOG_MODULE_REGISTER(sink_fs, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 struct sink_fs_config {
-  struct zstreamer_node_config common;
+  struct zstreamer_sink_config common;
   const char *mount_path;
   uint32_t delta_ms_threshold;
   uint32_t size_threshold;
 };
 
 struct sink_fs_data {
-  struct zstreamer_node_data common;
+  struct zstreamer_sink_data common;
   struct fs_file_t current_file;
   int64_t file_open_time;
   size_t current_file_size;
@@ -155,7 +155,7 @@ static int sink_fs_close(const struct device *dev) {
   return fs_close(&data->current_file);
 }
 
-static const struct zstreamer_node_driver_api sink_fs_api = {
+static const struct zstreamer_sink_driver_api sink_fs_api = {
     .open = sink_fs_open,
     .process = sink_fs_process,
     .close = sink_fs_close,
@@ -176,24 +176,19 @@ int sink_fs_set_filename_handler(const struct device *dev,
                    DT_INST_PROP(inst, size_threshold) != 0,                    \
                "sink-fs: at least one rotation threshold must be "             \
                "non-zero");                                                    \
-  Z_ZSTREAMER_NODE_CHILDREN_DEFINE(inst, DT_DRV_INST(inst));                   \
-  static K_THREAD_STACK_DEFINE(zstreamer_node_stack_##inst,                    \
-                               DT_INST_PROP(inst, thread_stack_size));         \
   static struct sink_fs_data sink_fs_data_##inst = {                           \
-      .common = Z_ZSTREAMER_NODE_DATA_INIT(inst, zstreamer_node_stack_##inst), \
+      .common = Z_ZSTREAMER_SINK_DATA_INIT(                                    \
+          inst, zstreamer_sink_stack_##inst),                                  \
   };                                                                           \
   static const struct sink_fs_config sink_fs_config_##inst = {                 \
-      .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(                                 \
-          inst, DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),      \
+      .common = {Z_ZSTREAMER_SINK_CONFIG_INIT(                                 \
+          DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
           DT_INST_PROP(inst, thread_priority))},                               \
       .mount_path = DT_INST_PROP(inst, mount_path),                            \
       .delta_ms_threshold = DT_INST_PROP(inst, delta_ms_threshold),            \
       .size_threshold = DT_INST_PROP(inst, size_threshold),                    \
   };                                                                           \
-  Z_ZSTREAMER_NODE_INIT_WRAPPER_DEFINE(inst, NULL)                             \
-  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_init_##inst, NULL,                \
-                        &sink_fs_data_##inst, &sink_fs_config_##inst,          \
-                        POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
-                        &sink_fs_api);
+  ZSTREAMER_SINK_DT_INST_DEFINE(inst, NULL, &sink_fs_data_##inst,              \
+                                &sink_fs_config_##inst, &sink_fs_api);
 
 DT_INST_FOREACH_STATUS_OKAY(SINK_FS_DEFINE)

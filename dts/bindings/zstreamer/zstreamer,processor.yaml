@@ -1,0 +1,18 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  zstreamer processor node. Processor nodes receive buffers, run
+  a process callback to transform them, and distribute the result
+  to their children.
+
+compatible: "zstreamer,processor"
+
+include: zstreamer,node.yaml
+
+properties:
+  children:
+    type: phandles
+    description: |
+      Downstream node(s) that this processor sends buffers to.
+      For fan-out, list multiple phandles.

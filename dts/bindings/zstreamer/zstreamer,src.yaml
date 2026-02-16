@@ -3,8 +3,16 @@
 
 description: |
   zstreamer source node. Source nodes run in their own thread and
-  produce buffers by calling the driver's run callback in a loop.
+  produce buffers by calling the driver's generate callback in a loop.
+  They distribute produced buffers to their children.
 
 compatible: "zstreamer,src"
 
 include: zstreamer,node.yaml
+
+properties:
+  children:
+    type: phandles
+    description: |
+      Downstream node(s) that this source sends buffers to.
+      For fan-out, list multiple phandles.

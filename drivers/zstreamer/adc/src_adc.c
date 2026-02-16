@@ -15,7 +15,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include <zstreamer/node.h>
+#include <zstreamer/source.h>
 
 #if defined(CONFIG_ZSTREAMER_ADC_STM32)
 #include "src_adc_stm32.h"
@@ -32,7 +32,7 @@ LOG_MODULE_REGISTER(src_adc, CONFIG_ZSTREAMER_LOG_LEVEL);
  */
 
 struct src_adc_config {
-  struct zstreamer_node_config common;
+  struct zstreamer_source_config common;
 
   /* ADC device (from first io-channel) */
   const struct device *adc_dev;
@@ -52,7 +52,7 @@ struct src_adc_config {
 };
 
 struct src_adc_data {
-  struct zstreamer_node_data common;
+  struct zstreamer_source_data common;
 
   /* Platform-specific state */
 #if defined(CONFIG_ZSTREAMER_ADC_STM32)
@@ -90,7 +90,7 @@ static void adc_buffer_ready_callback(void *user_data, const void *buffer,
 
 /*
  * ============================================================================
- * ZSTREAMER_NODE CALLBACKS
+ * ZSTREAMER SOURCE CALLBACKS
  * ============================================================================
  */
 
@@ -235,7 +235,7 @@ static int src_adc_process(const struct device *dev, struct net_buf *buf) {
  * ============================================================================
  */
 
-static const struct zstreamer_node_driver_api src_adc_api = {
+static const struct zstreamer_source_driver_api src_adc_api = {
     .open = src_adc_open,
     .close = src_adc_close,
     .generate = src_adc_process,
@@ -258,14 +258,12 @@ static const struct zstreamer_node_driver_api src_adc_api = {
 #define ADC_NUM_CHANNELS(node_id) MIN(DT_PROP_LEN(node_id, io_channels), 2)
 
 #define SRC_ADC_DEFINE(inst)                                                   \
-  Z_ZSTREAMER_NODE_CHILDREN_DEFINE(inst, DT_DRV_INST(inst));                   \
-  static K_THREAD_STACK_DEFINE(zstreamer_node_stack_##inst,                    \
-                               DT_INST_PROP(inst, thread_stack_size));         \
   static struct src_adc_data src_adc_data_##inst = {                           \
-      .common = Z_ZSTREAMER_NODE_DATA_INIT(inst, zstreamer_node_stack_##inst), \
+      .common = Z_ZSTREAMER_SOURCE_DATA_INIT(                                  \
+          inst, zstreamer_source_stack_##inst),                                \
   };                                                                           \
   static const struct src_adc_config src_adc_config_##inst = {                 \
-      .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(                                 \
+      .common = {Z_ZSTREAMER_SOURCE_CONFIG_INIT(                               \
           inst, DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),      \
           DT_INST_PROP(inst, thread_priority))},                               \
       .adc_dev = ADC_DEV_GET(DT_DRV_INST(inst)),                               \
@@ -283,10 +281,8 @@ static const struct zstreamer_node_driver_api src_adc_api = {
       .buffer_samples = DT_INST_PROP(inst, buffer_samples),                    \
       .dma_buffer_samples = DT_INST_PROP(inst, dma_buffer_samples),            \
   };                                                                           \
-  Z_ZSTREAMER_NODE_INIT_WRAPPER_DEFINE(inst, src_adc_init)                     \
-  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_init_##inst, NULL,                \
-                        &src_adc_data_##inst, &src_adc_config_##inst,          \
-                        POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
-                        &src_adc_api);
+  ZSTREAMER_SOURCE_DT_INST_DEFINE(inst, src_adc_init,                          \
+                                  &src_adc_data_##inst,                        \
+                                  &src_adc_config_##inst, &src_adc_api);
 
 DT_INST_FOREACH_STATUS_OKAY(SRC_ADC_DEFINE)

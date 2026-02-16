@@ -5,7 +5,12 @@
 
 /**
  * @file
- * @brief Public API for zstreamer_node drivers
+ * @brief Base types and helpers shared by all zstreamer node types
+ *
+ * This header provides the common base configuration, runtime data,
+ * and utility functions that all node types (source, sink, processor,
+ * filter) build upon.  Driver code should include the type-specific
+ * header (source.h, sink.h, processor.h, filter.h) instead.
  */
 
 #ifndef ZSTREAMER_NODE_H_
@@ -21,97 +26,44 @@ extern "C" {
 #endif
 
 /**
- * @brief zstreamer_node driver API
- * @defgroup zstreamer_node_interface zstreamer_node driver API
+ * @brief zstreamer node base API
+ * @defgroup zstreamer_node_interface zstreamer node base API
  * @ingroup io_interfaces
  * @{
  */
 
 /**
- * @brief Configuration shared by all zstreamer_node devices.
+ * @brief Base configuration shared by every zstreamer node device.
  *
- * Driver-specific config structs must embed this as the first member
- * named "common".
+ * Type-specific config structs embed this as the first member named
+ * "common" so that generic helpers can cast any node's config pointer
+ * to this type.
  */
 struct zstreamer_node_config {
   const struct device *graph;
-  const struct device *const *children;
-  size_t num_children;
   size_t thread_stack_size;
   int thread_priority;
   bool readonly;
 };
 
 /**
- * @brief Runtime data shared by all zstreamer_node devices.
+ * @brief Base runtime data shared by every zstreamer node device.
  *
- * Driver-specific data structs must embed this as the first member
- * named "common".
+ * Type-specific data structs embed this as the first member named
+ * "common" so that generic helpers can cast any node's data pointer
+ * to this type.
  */
 struct zstreamer_node_data {
   const struct device *dev;
   struct k_fifo fifo;
   struct k_thread thread;
   k_thread_stack_t *stack;
-  atomic_t running;
-  struct k_sem run_sem;
-  struct k_sem idle_sem;
 };
-
-/**
- * @brief zstreamer_node driver API structure.
- *
- * Source nodes implement generate(); non-source nodes implement process().
- * The framework thread handles buffer allocation and distribution.
- *
- * @param open      Optional. Called to set up hardware. For non-source nodes
- *                  this is called at boot. For source nodes it is called by
- *                  zstreamer_node_start().
- * @param close     Optional. Called to tear down hardware. For source nodes
- *                  it is called by zstreamer_node_stop().
- * @param generate  Source nodes only. Called with a pre-allocated buffer;
- *                  the driver fills it with data. Return 0 on success;
- *                  non-zero causes the buffer to be dropped.
- * @param process   Non-source nodes. Called for each received buffer.
- *                  Return 0 on success; non-zero causes the buffer to be
- *                  dropped.
- */
-__subsystem struct zstreamer_node_driver_api {
-  int (*open)(const struct device *dev);
-  int (*close)(const struct device *dev);
-  int (*generate)(const struct device *dev, struct net_buf *buf);
-  int (*process)(const struct device *dev, struct net_buf *buf);
-};
-
-/**
- * @brief Start a source node.
- *
- * Sets the running flag, calls the driver's open callback, and signals
- * the source thread to begin processing. Only valid for source nodes.
- *
- * @param dev Node device.
- * @return 0 on success, -EALREADY if already running, -ENOTSUP if
- *         not a source, or negative errno on failure.
- */
-int zstreamer_node_start(const struct device *dev);
-
-/**
- * @brief Stop a source node.
- *
- * Clears the running flag, waits for the source thread to become idle,
- * drains pending buffers, and calls the driver's close callback.
- * Only valid for source nodes.
- *
- * @param dev Node device.
- * @return 0 on success, -EALREADY if already stopped, -ENOTSUP if
- *         not a source, or negative errno on failure.
- */
-int zstreamer_node_stop(const struct device *dev);
 
 /**
  * @brief Allocate a buffer from the node's graph pool.
  *
- * @param dev     Node device.
+ * @param dev     Any zstreamer node device.
  * @param timeout Allocation timeout.
  * @return Pointer to allocated net_buf, or NULL on timeout.
  */
@@ -121,95 +73,78 @@ struct net_buf *zstreamer_node_alloc_buf(const struct device *dev,
 /** @cond INTERNAL_HIDDEN */
 
 /**
- * Common init function called from the device init wrapper.
- * Sets the dev back-pointer, initializes the fifo and semaphores,
- * calls open() for non-source nodes, and creates the thread.
+ * Base init: sets dev back-pointer, initializes the fifo, and creates
+ * the node thread with the given entry point.
  */
-extern int zstreamer_node_common_init(const struct device *dev);
+extern int zstreamer_node_base_init(const struct device *dev,
+                                     k_thread_entry_t entry);
+
+/**
+ * Distribute a buffer to an explicit list of child devices, honouring
+ * the copy-on-write / readonly optimisation.
+ */
+extern void zstreamer_node_distribute(const struct device *dev,
+                                       struct net_buf *buf,
+                                       const struct device *const *children,
+                                       size_t num_children);
+
+/**
+ * Drain (unref) all pending buffers from a fifo.
+ */
+extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
 
 /*
- * Helper: generate children array from DT phandles.
- * Expands to an empty array if the node has no children property.
+ * Base config initializer (no children).
+ */
+#define Z_ZSTREAMER_NODE_CONFIG_INIT(node_id, _stack_size, _prio)              \
+  .graph = DEVICE_DT_GET(DT_PARENT(node_id)),                                  \
+  .thread_stack_size = _stack_size, .thread_priority = _prio
+
+/*
+ * Base data initializer.
+ */
+#define Z_ZSTREAMER_NODE_DATA_INIT(_stack)                                     \
+  {                                                                            \
+      .stack = _stack,                                                         \
+  }
+
+/*
+ * Helper: get a device pointer from a phandle-array element.
  */
 #define Z_ZSTREAMER_NODE_CHILD_DEV_GET(node_id, prop, idx)                     \
   DEVICE_DT_GET(DT_PHANDLE_BY_IDX(node_id, prop, idx))
 
-#define Z_ZSTREAMER_NODE_CHILDREN_DEFINE(inst, node_id)                        \
-  static const struct device *const zstreamer_node_children_##inst[] = {       \
+/*
+ * Helper: define a children device-pointer array from DT phandles.
+ */
+#define Z_ZSTREAMER_CHILDREN_DEFINE(prefix, inst, node_id)                     \
+  static const struct device *const prefix##_children_##inst[] = {             \
       COND_CODE_1(                                                             \
           DT_NODE_HAS_PROP(node_id, children),                                 \
           (DT_FOREACH_PROP_ELEM_SEP(node_id, children,                         \
                                     Z_ZSTREAMER_NODE_CHILD_DEV_GET, (, ))),    \
           ())}
 
-#define Z_ZSTREAMER_NODE_NUM_CHILDREN(node_id)                                 \
+#define Z_ZSTREAMER_NUM_CHILDREN(node_id)                                      \
   COND_CODE_1(DT_NODE_HAS_PROP(node_id, children),                             \
               (DT_PROP_LEN(node_id, children)), (0))
 
 /*
- * Config initializer.
+ * Helper: define a false-children device-pointer array from DT phandles.
  */
-#define Z_ZSTREAMER_NODE_CONFIG_INIT(inst, node_id, _stack_size, _prio)        \
-  .graph = DEVICE_DT_GET(DT_PARENT(node_id)),                                  \
-  .children = zstreamer_node_children_##inst,                                  \
-  .num_children = Z_ZSTREAMER_NODE_NUM_CHILDREN(node_id),                      \
-  .thread_stack_size = _stack_size, .thread_priority = _prio
+#define Z_ZSTREAMER_FALSE_CHILDREN_DEFINE(prefix, inst, node_id)               \
+  static const struct device *const prefix##_false_children_##inst[] = {       \
+      COND_CODE_1(                                                             \
+          DT_NODE_HAS_PROP(node_id, false_children),                           \
+          (DT_FOREACH_PROP_ELEM_SEP(node_id, false_children,                   \
+                                    Z_ZSTREAMER_NODE_CHILD_DEV_GET, (, ))),    \
+          ())}
 
-/*
- * Data initializer.
- */
-#define Z_ZSTREAMER_NODE_DATA_INIT(inst, _stack)                               \
-  {                                                                            \
-      .stack = _stack,                                                         \
-  }
-
-/*
- * Init wrapper: calls driver init (if provided), then common init.
- */
-#define Z_ZSTREAMER_NODE_INIT_WRAPPER_DEFINE(inst, _driver_init)               \
-  static int zstreamer_node_init_##inst(const struct device *dev) {            \
-    int (*init_fn)(const struct device *) = _driver_init;                      \
-    if (init_fn != NULL) {                                                     \
-      int ret = init_fn(dev);                                                  \
-      if (ret != 0) {                                                          \
-        return ret;                                                            \
-      }                                                                        \
-    }                                                                          \
-    return zstreamer_node_common_init(dev);                                    \
-  }
+#define Z_ZSTREAMER_NUM_FALSE_CHILDREN(node_id)                                \
+  COND_CODE_1(DT_NODE_HAS_PROP(node_id, false_children),                       \
+              (DT_PROP_LEN(node_id, false_children)), (0))
 
 /** @endcond */
-
-/**
- * @brief Define a zstreamer_node device from a devicetree node identifier.
- *
- * All nodes (source, sink, or generic) use this single macro.
- * A dedicated thread stack is always allocated.
- *
- * @param inst       Unique instance number (used for symbol naming).
- * @param node_id    Devicetree node identifier.
- * @param init_fn    Driver init function (or NULL).
- * @param data_ptr   Pointer to driver-specific data struct.
- * @param cfg_ptr    Pointer to driver-specific config struct.
- * @param api_ptr    Pointer to zstreamer_node_driver_api struct.
- */
-#define ZSTREAMER_NODE_DT_DEFINE(inst, node_id, init_fn, data_ptr, cfg_ptr,    \
-                                 api_ptr)                                      \
-  Z_ZSTREAMER_NODE_CHILDREN_DEFINE(inst, node_id);                             \
-  static K_THREAD_STACK_DEFINE(zstreamer_node_stack_##inst,                    \
-                               DT_PROP(node_id, thread_stack_size));           \
-  Z_ZSTREAMER_NODE_INIT_WRAPPER_DEFINE(inst, init_fn)                          \
-  DEVICE_DT_DEFINE(node_id, zstreamer_node_init_##inst, NULL, data_ptr,        \
-                   cfg_ptr, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,   \
-                   api_ptr)
-
-/**
- * @brief Instance-based node definition macro.
- */
-#define ZSTREAMER_NODE_DT_INST_DEFINE(inst, init_fn, data_ptr, cfg_ptr,        \
-                                      api_ptr)                                 \
-  ZSTREAMER_NODE_DT_DEFINE(inst, DT_DRV_INST(inst), init_fn, data_ptr,         \
-                           cfg_ptr, api_ptr)
 
 /**
  * @}

@@ -2,20 +2,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 description: |
-  Base binding for zstreamer node streaming node devices.
-  All zstreamer node driver bindings should include this file.
+  Base binding for zstreamer streaming node devices.
+  All zstreamer node driver bindings should include this file
+  (via one of the type-specific intermediaries: src, sink,
+  processor, or filter).
 
 compatible: "zstreamer,node"
 
 include: base.yaml
 
 properties:
-  children:
-    type: phandles
-    description: |
-      Downstream node(s) that this node sends buffers to.
-      For fan-out, list multiple phandles.
-
   thread-stack-size:
     type: int
     default: 1024

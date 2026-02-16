@@ -8,4 +8,8 @@ zephyr_include_directories(${ZEPHYR_ZSTREAMER_MODULE_DIR}/include)
 zephyr_library_sources(
   graph.c
   node.c
+  source.c
+  sink.c
+  processor.c
+  filter.c
 )

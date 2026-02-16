@@ -9,7 +9,7 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/logging/log.h>
 
-#include <zstreamer/node.h>
+#include <zstreamer/sink.h>
 
 #if defined(CONFIG_UART_ASYNC_API)
 #include "uart_dma_context.h"
@@ -18,12 +18,12 @@
 LOG_MODULE_REGISTER(sink_uart, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 struct sink_uart_config {
-  struct zstreamer_node_config common;
+  struct zstreamer_sink_config common;
   const struct device *uart_dev;
 };
 
 struct sink_uart_data {
-  struct zstreamer_node_data common;
+  struct zstreamer_sink_data common;
 #if defined(CONFIG_UART_ASYNC_API)
   struct k_sem tx_sem;
   int tx_err;
@@ -131,7 +131,7 @@ static int sink_uart_close(const struct device *dev) {
 }
 #endif
 
-static const struct zstreamer_node_driver_api sink_uart_api = {
+static const struct zstreamer_sink_driver_api sink_uart_api = {
 #if defined(CONFIG_UART_ASYNC_API)
     .open = sink_uart_open,
     .close = sink_uart_close,
@@ -152,22 +152,18 @@ static int sink_uart_init(const struct device *dev) {
 #endif
 
 #define SINK_UART_DEFINE(inst)                                                 \
-  Z_ZSTREAMER_NODE_CHILDREN_DEFINE(inst, DT_DRV_INST(inst));                   \
-  static K_THREAD_STACK_DEFINE(zstreamer_node_stack_##inst,                    \
-                               DT_INST_PROP(inst, thread_stack_size));         \
   static struct sink_uart_data sink_uart_data_##inst = {                       \
-      .common = Z_ZSTREAMER_NODE_DATA_INIT(inst, zstreamer_node_stack_##inst), \
+      .common = Z_ZSTREAMER_SINK_DATA_INIT(                                    \
+          inst, zstreamer_sink_stack_##inst),                                  \
   };                                                                           \
   static const struct sink_uart_config sink_uart_config_##inst = {             \
-      .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(                                 \
-          inst, DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),      \
+      .common = {Z_ZSTREAMER_SINK_CONFIG_INIT(                                 \
+          DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
           DT_INST_PROP(inst, thread_priority))},                               \
       .uart_dev = DEVICE_DT_GET(DT_INST_PHANDLE(inst, uart_device)),           \
   };                                                                           \
-  Z_ZSTREAMER_NODE_INIT_WRAPPER_DEFINE(inst, SINK_UART_INIT_FN)                \
-  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_init_##inst, NULL,                \
-                        &sink_uart_data_##inst, &sink_uart_config_##inst,      \
-                        POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
-                        &sink_uart_api);
+  ZSTREAMER_SINK_DT_INST_DEFINE(inst, SINK_UART_INIT_FN,                       \
+                                &sink_uart_data_##inst,                        \
+                                &sink_uart_config_##inst, &sink_uart_api);
 
 DT_INST_FOREACH_STATUS_OKAY(SINK_UART_DEFINE)

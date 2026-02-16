@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 description: |
-  zstreamer sink node. Sink nodes run in their own thread and
-  consume buffers by blocking on their fifo and calling the
-  driver's process callback for each received buffer.
+  zstreamer sink node. Sink nodes are terminal — they consume
+  buffers but never distribute to children. The children property
+  is deliberately absent from this binding.
 
 compatible: "zstreamer,sink"
 

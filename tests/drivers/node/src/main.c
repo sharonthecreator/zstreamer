@@ -11,6 +11,7 @@
 #include <zephyr/ztest.h>
 
 #include <zstreamer/node.h>
+#include <zstreamer/source.h>
 
 #define GRAPH_NODE DT_NODELABEL(streaming_graph)
 #define SRC_NODE DT_NODELABEL(uart_source)
@@ -34,7 +35,7 @@ static void cleanup(void *fixture) {
 
   ARG_UNUSED(fixture);
 
-  zstreamer_node_stop(src_dev);
+  zstreamer_source_stop(src_dev);
   uart_emul_flush_rx_data(uart_src_dev);
   uart_emul_flush_tx_data(uart_sink_dev);
   /* Consume anything the sink already wrote. */
@@ -58,26 +59,19 @@ ZTEST(zstreamer_node_uart, test_devices_ready) {
 ZTEST(zstreamer_node_uart, test_start_stop) {
   int ret;
 
-  /* Sink start/stop must return -ENOTSUP (non-source). */
-  ret = zstreamer_node_start(sink_dev);
-  zassert_equal(ret, -ENOTSUP, "sink start: %d", ret);
-
-  ret = zstreamer_node_stop(sink_dev);
-  zassert_equal(ret, -ENOTSUP, "sink stop: %d", ret);
-
   /* Source start/stop. */
-  ret = zstreamer_node_start(src_dev);
+  ret = zstreamer_source_start(src_dev);
   zassert_equal(ret, 0, "src start failed: %d", ret);
 
   /* Starting again must return -EALREADY. */
-  ret = zstreamer_node_start(src_dev);
+  ret = zstreamer_source_start(src_dev);
   zassert_equal(ret, -EALREADY, "double start: %d", ret);
 
-  ret = zstreamer_node_stop(src_dev);
+  ret = zstreamer_source_stop(src_dev);
   zassert_equal(ret, 0, "src stop failed: %d", ret);
 
   /* Stopping again must return -EALREADY. */
-  ret = zstreamer_node_stop(src_dev);
+  ret = zstreamer_source_stop(src_dev);
   zassert_equal(ret, -EALREADY, "double stop: %d", ret);
 }
 
@@ -98,14 +92,14 @@ ZTEST(zstreamer_node_uart, test_uart_relay) {
   uint32_t rx_len;
   int ret;
 
-  ret = zstreamer_node_start(src_dev);
+  ret = zstreamer_source_start(src_dev);
   zassert_equal(ret, 0, "src start: %d", ret);
 
   uart_emul_put_rx_data(uart_src_dev, tx_data, tx_len);
 
   k_msleep(500);
 
-  ret = zstreamer_node_stop(src_dev);
+  ret = zstreamer_source_stop(src_dev);
   zassert_equal(ret, 0);
 
   rx_len = uart_emul_get_tx_data(uart_sink_dev, rx_buf, sizeof(rx_buf));
@@ -128,7 +122,7 @@ ZTEST(zstreamer_node_uart, test_long_transfer) {
     tx_data[i] = (uint8_t)(i & 0xff);
   }
 
-  ret = zstreamer_node_start(src_dev);
+  ret = zstreamer_source_start(src_dev);
   zassert_equal(ret, 0);
 
   uart_emul_put_rx_data(uart_src_dev, tx_data, sizeof(tx_data));
@@ -136,7 +130,7 @@ ZTEST(zstreamer_node_uart, test_long_transfer) {
   /* Allow more time for multiple buffer cycles. */
   k_msleep(1000);
 
-  ret = zstreamer_node_stop(src_dev);
+  ret = zstreamer_source_stop(src_dev);
   zassert_equal(ret, 0);
 
   rx_total = uart_emul_get_tx_data(uart_sink_dev, rx_buf, sizeof(rx_buf));
@@ -159,7 +153,7 @@ ZTEST(zstreamer_node_uart, test_burst_writes) {
     memcpy(expected + i * msg_len, msgs[i], msg_len);
   }
 
-  ret = zstreamer_node_start(src_dev);
+  ret = zstreamer_source_start(src_dev);
   zassert_equal(ret, 0);
 
   for (size_t i = 0; i < n_msgs; i++) {
@@ -169,7 +163,7 @@ ZTEST(zstreamer_node_uart, test_burst_writes) {
 
   k_msleep(500);
 
-  ret = zstreamer_node_stop(src_dev);
+  ret = zstreamer_source_stop(src_dev);
   zassert_equal(ret, 0);
 
   rx_total = uart_emul_get_tx_data(uart_sink_dev, rx_buf, sizeof(rx_buf));
@@ -187,13 +181,13 @@ ZTEST(zstreamer_node_uart, test_restart_cycle) {
   for (int cycle = 0; cycle < 5; cycle++) {
     int ret;
 
-    ret = zstreamer_node_start(src_dev);
+    ret = zstreamer_source_start(src_dev);
     zassert_equal(ret, 0, "cycle %d src start", cycle);
 
     uart_emul_put_rx_data(uart_src_dev, pattern, 2);
     k_msleep(200);
 
-    ret = zstreamer_node_stop(src_dev);
+    ret = zstreamer_source_stop(src_dev);
     zassert_equal(ret, 0);
 
     rx_len = uart_emul_get_tx_data(uart_sink_dev, rx_buf, sizeof(rx_buf));
@@ -216,14 +210,14 @@ ZTEST(zstreamer_node_uart, test_throughput_stress) {
     tx_data[i] = (uint8_t)((i * 7 + 13) & 0xff);
   }
 
-  ret = zstreamer_node_start(src_dev);
+  ret = zstreamer_source_start(src_dev);
   zassert_equal(ret, 0);
 
   uart_emul_put_rx_data(uart_src_dev, tx_data, sizeof(tx_data));
 
   k_msleep(2000);
 
-  ret = zstreamer_node_stop(src_dev);
+  ret = zstreamer_source_stop(src_dev);
   zassert_equal(ret, 0);
 
   rx_total = uart_emul_get_tx_data(uart_sink_dev, rx_buf, sizeof(rx_buf));
@@ -257,7 +251,7 @@ static void run_large_transfer(uint32_t total, uint32_t chunk) {
   uint32_t rx_pos = 0;
   int ret;
 
-  ret = zstreamer_node_start(src_dev);
+  ret = zstreamer_source_start(src_dev);
   zassert_equal(ret, 0, "src start");
 
   while (tx_pos < total || rx_pos < total) {
@@ -310,7 +304,7 @@ static void run_large_transfer(uint32_t total, uint32_t chunk) {
     }
   }
 
-  ret = zstreamer_node_stop(src_dev);
+  ret = zstreamer_source_stop(src_dev);
   zassert_equal(ret, 0, "src stop");
 
   zassert_equal(rx_pos, total, "total mismatch: expected %u, got %u", total,
@@ -336,7 +330,7 @@ ZTEST(zstreamer_node_uart, test_2mb_varied_chunks) {
   uint32_t ci = 0;
   int ret;
 
-  ret = zstreamer_node_start(src_dev);
+  ret = zstreamer_source_start(src_dev);
   zassert_equal(ret, 0);
 
   while (tx_pos < total || rx_pos < total) {
@@ -386,7 +380,7 @@ ZTEST(zstreamer_node_uart, test_2mb_varied_chunks) {
     }
   }
 
-  ret = zstreamer_node_stop(src_dev);
+  ret = zstreamer_source_stop(src_dev);
   zassert_equal(ret, 0);
 
   zassert_equal(rx_pos, total, "total: expected %u, got %u", total, rx_pos);
@@ -399,7 +393,7 @@ ZTEST(zstreamer_node_uart, test_2mb_varied_chunks) {
 static void numgen_cleanup(void *fixture) {
   ARG_UNUSED(fixture);
 
-  zstreamer_node_stop(numgen_src_dev);
+  zstreamer_source_stop(numgen_src_dev);
 }
 
 ZTEST_SUITE(zstreamer_node_test, NULL, NULL, numgen_cleanup, numgen_cleanup,
@@ -413,29 +407,22 @@ ZTEST(zstreamer_node_test, test_numgen_fakesink_devices_ready) {
 ZTEST(zstreamer_node_test, test_numgen_fakesink_start_stop) {
   int ret;
 
-  /* Fakesink start/stop must return -ENOTSUP (non-source). */
-  ret = zstreamer_node_start(fake_sink_dev);
-  zassert_equal(ret, -ENOTSUP, "fakesink start: %d", ret);
-
-  ret = zstreamer_node_stop(fake_sink_dev);
-  zassert_equal(ret, -ENOTSUP, "fakesink stop: %d", ret);
-
   /* Source start/stop. */
-  ret = zstreamer_node_start(numgen_src_dev);
+  ret = zstreamer_source_start(numgen_src_dev);
   zassert_true((ret == 0) || (ret == -EALREADY), "numgen start unexpected: %d",
                ret);
 
   /* Starting again should report already running on stable targets. */
-  ret = zstreamer_node_start(numgen_src_dev);
+  ret = zstreamer_source_start(numgen_src_dev);
   zassert_true((ret == 0) || (ret == -EALREADY), "double start unexpected: %d",
                ret);
 
-  ret = zstreamer_node_stop(numgen_src_dev);
+  ret = zstreamer_source_stop(numgen_src_dev);
   zassert_true((ret == 0) || (ret == -EALREADY), "numgen stop unexpected: %d",
                ret);
 
   /* Stopping again should report already stopped on stable targets. */
-  ret = zstreamer_node_stop(numgen_src_dev);
+  ret = zstreamer_source_stop(numgen_src_dev);
   zassert_true((ret == 0) || (ret == -EALREADY), "double stop unexpected: %d",
                ret);
 }
@@ -445,16 +432,16 @@ ZTEST(zstreamer_node_test, test_numgen_fakesink_restart_cycle) {
     int ret;
 
     /* Best-effort cleanup between cycles. */
-    (void)zstreamer_node_stop(numgen_src_dev);
+    (void)zstreamer_source_stop(numgen_src_dev);
 
-    ret = zstreamer_node_start(numgen_src_dev);
+    ret = zstreamer_source_start(numgen_src_dev);
     zassert_true((ret == 0) || (ret == -EALREADY), "cycle %d numgen start: %d",
                  cycle, ret);
 
     /* Let the pipeline run briefly. */
     k_msleep(50);
 
-    ret = zstreamer_node_stop(numgen_src_dev);
+    ret = zstreamer_source_stop(numgen_src_dev);
     zassert_true((ret == 0) || (ret == -EALREADY), "cycle %d numgen stop: %d",
                  cycle, ret);
   }

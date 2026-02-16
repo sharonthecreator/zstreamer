@@ -1,0 +1,23 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  zstreamer filter node. Filter nodes receive buffers, run a
+  boolean filter callback, and distribute the buffer to either
+  the children (filter returns true) or the false-children
+  (filter returns false).
+
+compatible: "zstreamer,filter"
+
+include: zstreamer,node.yaml
+
+properties:
+  children:
+    type: phandles
+    description: |
+      Downstream node(s) for the filter-true path.
+
+  false-children:
+    type: phandles
+    description: |
+      Downstream node(s) for the filter-false path.
