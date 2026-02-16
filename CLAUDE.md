@@ -3,6 +3,9 @@
 ## Design Rules
 
 - **No DTS duplication**: Properties configurable through a normal device's DTS (e.g., SPI frequency, UART baud rate) must NOT be duplicated in the zstnode's device DTS. The zstnode should reference the device and use its existing config.
+- **Source/non-source API contract is strict**: First `zstreamer_node_start()` on a source should return `0`, second `-EALREADY`; first `zstreamer_node_stop()` should return `0`, second `-EALREADY`. Do not weaken tests to accept both codes for the same call sequence.
+- **Do not depend on `struct net_buf` internals**: avoid direct checks on fields like `buf->ref`; use public net_buf APIs and explicit state in zstreamer where needed.
+- **Keep DTS vendor registration present**: module-local compatibles using `zstreamer,*` require `dts/bindings/vendor-prefixes.txt` with a `zstreamer` entry to avoid dtc warnings/errors in stricter paths.
 
 ## Environment
 
@@ -22,3 +25,4 @@
 - The `streaming-graph` node does NOT use `#address-cells`/`#size-cells`/`reg` — child zstnodes use plain names (no `@N` suffix)
 - Zephyr SPI emulator (`zephyr,spi-emul-controller`) does NOT support async/signal mode - only sync `transceive`. Tests on native_sim can only test the polling path.
 - Zephyr SPI async uses `k_poll_signal` (not callbacks). Pattern: init signal, pass to `spi_*_signal()`, wait with `k_poll()`, reset signal before reuse.
+- Current known failure: `tests/drivers/node` can hang in `test_numgen_fakesink_restart_cycle` on `native_sim/native/64` (Docker too). Reproduce with `west build -b native_sim/native/64 -d build/test-node-review tests/drivers/node` then `timeout 45s west build -d build/test-node-review -t run`.

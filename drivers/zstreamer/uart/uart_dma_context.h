@@ -31,7 +31,7 @@ extern "C" {
  * @param len        Length of received data.
  */
 typedef void (*uart_dma_rx_handler_t)(void *user_data, const uint8_t *data,
-				      size_t len);
+                                      size_t len);
 
 /**
  * @brief TX complete handler callback type.
@@ -52,8 +52,8 @@ typedef void (*uart_dma_tx_handler_t)(void *user_data, int err);
  * @return 0 on success, -EBUSY if already registered, -ENOMEM if no slots.
  */
 int uart_dma_context_register_rx(const struct device *uart_dev,
-				 uart_dma_rx_handler_t handler,
-				 void *user_data);
+                                 uart_dma_rx_handler_t handler,
+                                 void *user_data);
 
 /**
  * @brief Unregister the RX handler for a UART device.
@@ -73,8 +73,8 @@ void uart_dma_context_unregister_rx(const struct device *uart_dev);
  * @return 0 on success, -EBUSY if already registered, -ENOMEM if no slots.
  */
 int uart_dma_context_register_tx(const struct device *uart_dev,
-				 uart_dma_tx_handler_t handler,
-				 void *user_data);
+                                 uart_dma_tx_handler_t handler,
+                                 void *user_data);
 
 /**
  * @brief Unregister the TX handler for a UART device.
@@ -93,7 +93,7 @@ void uart_dma_context_unregister_tx(const struct device *uart_dev);
  * @return 0 on success, negative errno on failure.
  */
 int uart_dma_context_rx_enable(const struct device *uart_dev, uint8_t *buf,
-			       size_t len, int32_t timeout);
+                               size_t len, int32_t timeout);
 
 /**
  * @brief Disable RX on a UART device.
@@ -114,7 +114,7 @@ int uart_dma_context_rx_disable(const struct device *uart_dev);
  * @return 0 on success, negative errno on failure.
  */
 int uart_dma_context_tx(const struct device *uart_dev, const uint8_t *data,
-			size_t len);
+                        size_t len);
 
 #ifdef __cplusplus
 }
