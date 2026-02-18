@@ -30,8 +30,6 @@ extern "C" {
 
 struct zstreamer_source_config {
   struct zstreamer_node_config common;
-  const struct device *const *children;
-  size_t num_children;
 };
 
 struct zstreamer_source_data {
@@ -85,9 +83,8 @@ int zstreamer_source_stop(const struct device *dev);
 extern int zstreamer_source_common_init(const struct device *dev);
 
 #define Z_ZSTREAMER_SOURCE_CONFIG_INIT(inst, node_id, _stack_size, _prio)      \
-  .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(node_id, _stack_size, _prio)},       \
-  .children = zstreamer_source_children_##inst,                                \
-  .num_children = Z_ZSTREAMER_NUM_CHILDREN(node_id)
+  .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(node_id, _stack_size, _prio,         \
+      zstreamer_source_children_##inst, Z_ZSTREAMER_NUM_CHILDREN(node_id))}
 
 #define Z_ZSTREAMER_SOURCE_DATA_INIT(inst, _stack)                             \
   {                                                                            \
@@ -107,13 +104,27 @@ extern int zstreamer_source_common_init(const struct device *dev);
   }
 
 /**
+ * @brief Pre-define the thread stack and children array for a source node.
+ *
+ * Call this BEFORE defining the driver's data/config structs so the
+ * stack and children symbols are visible to their initialisers.
+ */
+#define ZSTREAMER_SOURCE_DT_PRE_DEFINE(inst, node_id)                          \
+  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_source, inst, node_id);                \
+  static K_THREAD_STACK_DEFINE(zstreamer_source_stack_##inst,                  \
+                               DT_PROP(node_id, thread_stack_size))
+
+#define ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst)                              \
+  ZSTREAMER_SOURCE_DT_PRE_DEFINE(inst, DT_DRV_INST(inst))
+
+/**
  * @brief Define a zstreamer source node device from a DT node identifier.
+ *
+ * The thread stack and children array must already have been emitted
+ * with ZSTREAMER_SOURCE_DT_PRE_DEFINE / ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE.
  */
 #define ZSTREAMER_SOURCE_DT_DEFINE(inst, node_id, init_fn, data_ptr, cfg_ptr,  \
                                     api_ptr)                                    \
-  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_source, inst, node_id);                \
-  static K_THREAD_STACK_DEFINE(zstreamer_source_stack_##inst,                  \
-                               DT_PROP(node_id, thread_stack_size));           \
   Z_ZSTREAMER_SOURCE_INIT_WRAPPER_DEFINE(inst, init_fn)                        \
   DEVICE_DT_DEFINE(node_id, zstreamer_source_init_##inst, NULL, data_ptr,      \
                    cfg_ptr, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,   \

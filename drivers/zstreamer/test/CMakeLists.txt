@@ -4,6 +4,10 @@
 zephyr_library()
 
 zephyr_include_directories(${ZEPHYR_ZSTREAMER_MODULE_DIR}/include)
+zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_TEST_NUMGEN_SRC src_numgen.c)
-zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_TEST_FAKE_SINK sink_fake.c)
+zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_TEST_NUMGEN_SRC numgen_src.c)
+zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_TEST_FAKE_SINK fake_sink.c)
+zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_TEST_COUNT_SINK count_sink.c)
+zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_TEST_PASSTHROUGH_NODE passthrough_node.c)
+zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_TEST_ODD_FILTER odd_filter.c)

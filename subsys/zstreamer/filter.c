@@ -38,7 +38,8 @@ static void filter_thread_entry(void *p1, void *p2, void *p3) {
     bool result = api->filter(dev, buf);
 
     if (result) {
-      zstreamer_node_distribute(dev, buf, cfg->children, cfg->num_children);
+      zstreamer_node_distribute(dev, buf, cfg->common.children,
+                                cfg->common.num_children);
     } else {
       zstreamer_node_distribute(dev, buf, cfg->false_children,
                                 cfg->num_false_children);

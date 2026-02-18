@@ -29,9 +29,9 @@
 #include <stm32_ll_dma.h>
 #include <stm32_ll_tim.h>
 
-#include "src_adc_stm32.h"
+#include "adc_src_stm32.h"
 
-LOG_MODULE_REGISTER(src_adc_stm32, CONFIG_ZSTREAMER_LOG_LEVEL);
+LOG_MODULE_REGISTER(adc_src_stm32, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 /*
  * ============================================================================
@@ -199,7 +199,7 @@ static void free_dma_buffer(void *buffer) {
  */
 
 /* Global pointer for ISR context - only supports one instance currently */
-static struct src_adc_stm32_data *g_active_data;
+static struct adc_src_stm32_data *g_active_data;
 
 /**
  * DMA half-transfer and transfer-complete handler.
@@ -208,7 +208,7 @@ static struct src_adc_stm32_data *g_active_data;
  * complete.
  */
 static void __maybe_unused adc_dma_callback(bool half_complete) {
-  struct src_adc_stm32_data *data = g_active_data;
+  struct adc_src_stm32_data *data = g_active_data;
 
   if (data == NULL || !data->running || data->cfg.callback == NULL) {
     return;
@@ -296,7 +296,7 @@ static int configure_timer_trgo(TIM_TypeDef *timer, uint32_t sample_rate_hz) {
 /**
  * Configure ADC for external trigger and DMA.
  */
-static int configure_adc(struct src_adc_stm32_data *data, ADC_TypeDef *adc,
+static int configure_adc(struct adc_src_stm32_data *data, ADC_TypeDef *adc,
                          TIM_TypeDef *timer) {
   uint32_t extsel;
   uint32_t resolution;
@@ -463,7 +463,7 @@ static int configure_adc(struct src_adc_stm32_data *data, ADC_TypeDef *adc,
  * Zephyr's DMA driver doesn't support all the features we need for
  * continuous ADC capture (circular mode with half-transfer interrupt).
  */
-static int configure_dma_stm32u5(struct src_adc_stm32_data *data,
+static int configure_dma_stm32u5(struct adc_src_stm32_data *data,
                                  ADC_TypeDef *adc) {
   /* For simplicity in this implementation, we'll use GPDMA1 Channel 0 */
   /* In a production implementation, this should be configurable via DT */
@@ -547,8 +547,8 @@ static int configure_dma_stm32u5(struct src_adc_stm32_data *data,
  * ============================================================================
  */
 
-int src_adc_stm32_init(struct src_adc_stm32_data *data,
-                       const struct src_adc_stm32_config *cfg) {
+int adc_src_stm32_init(struct adc_src_stm32_data *data,
+                       const struct adc_src_stm32_config *cfg) {
   int ret;
 
   if (data == NULL || cfg == NULL) {
@@ -613,7 +613,7 @@ int src_adc_stm32_init(struct src_adc_stm32_data *data,
   return 0;
 }
 
-int src_adc_stm32_start(struct src_adc_stm32_data *data) {
+int adc_src_stm32_start(struct adc_src_stm32_data *data) {
   if (data == NULL || data->running) {
     return -EINVAL;
   }
@@ -641,7 +641,7 @@ int src_adc_stm32_start(struct src_adc_stm32_data *data) {
   return 0;
 }
 
-int src_adc_stm32_stop(struct src_adc_stm32_data *data) {
+int adc_src_stm32_stop(struct adc_src_stm32_data *data) {
   if (data == NULL || !data->running) {
     return -EINVAL;
   }
@@ -671,13 +671,13 @@ int src_adc_stm32_stop(struct src_adc_stm32_data *data) {
   return 0;
 }
 
-void src_adc_stm32_deinit(struct src_adc_stm32_data *data) {
+void adc_src_stm32_deinit(struct adc_src_stm32_data *data) {
   if (data == NULL) {
     return;
   }
 
   if (data->running) {
-    src_adc_stm32_stop(data);
+    adc_src_stm32_stop(data);
   }
 
   /* Disable DMA interrupts */

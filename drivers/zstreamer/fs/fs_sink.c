@@ -13,31 +13,31 @@
 #include <zephyr/net_buf.h>
 
 #include <zstreamer/sink.h>
-#include <zstreamer/sink_fs.h>
+#include <zstreamer/fs_sink.h>
 
-LOG_MODULE_REGISTER(sink_fs, CONFIG_ZSTREAMER_LOG_LEVEL);
+LOG_MODULE_REGISTER(fs_sink, CONFIG_ZSTREAMER_LOG_LEVEL);
 
-struct sink_fs_config {
+struct fs_sink_config {
   struct zstreamer_sink_config common;
   const char *mount_path;
   uint32_t delta_ms_threshold;
   uint32_t size_threshold;
 };
 
-struct sink_fs_data {
+struct fs_sink_data {
   struct zstreamer_sink_data common;
   struct fs_file_t current_file;
   int64_t file_open_time;
   size_t current_file_size;
   uint32_t file_index;
-  sink_fs_filename_cb_t filename_cb;
+  fs_sink_filename_cb_t filename_cb;
   void *filename_cb_user_data;
 };
 
 static int default_filename_cb(const struct device *dev, char *buf,
                                size_t buf_size, void *user_data) {
-  const struct sink_fs_config *cfg = dev->config;
-  struct sink_fs_data *data = dev->data;
+  const struct fs_sink_config *cfg = dev->config;
+  struct fs_sink_data *data = dev->data;
   int n;
 
   ARG_UNUSED(user_data);
@@ -51,7 +51,7 @@ static int default_filename_cb(const struct device *dev, char *buf,
 }
 
 static int open_new_file(const struct device *dev) {
-  struct sink_fs_data *data = dev->data;
+  struct fs_sink_data *data = dev->data;
   char filename[MAX_FILE_NAME + 1];
   int ret;
 
@@ -79,7 +79,7 @@ static int open_new_file(const struct device *dev) {
 }
 
 static int rotate_file(const struct device *dev) {
-  struct sink_fs_data *data = dev->data;
+  struct fs_sink_data *data = dev->data;
   int ret;
 
   ret = fs_close(&data->current_file);
@@ -94,8 +94,8 @@ static int rotate_file(const struct device *dev) {
 }
 
 static bool should_rotate(const struct device *dev, size_t incoming_len) {
-  const struct sink_fs_config *cfg = dev->config;
-  struct sink_fs_data *data = dev->data;
+  const struct fs_sink_config *cfg = dev->config;
+  struct fs_sink_data *data = dev->data;
 
   if (cfg->delta_ms_threshold > 0) {
     int64_t elapsed = k_uptime_get() - data->file_open_time;
@@ -114,8 +114,8 @@ static bool should_rotate(const struct device *dev, size_t incoming_len) {
   return false;
 }
 
-static int sink_fs_open(const struct device *dev) {
-  struct sink_fs_data *data = dev->data;
+static int fs_sink_open(const struct device *dev) {
+  struct fs_sink_data *data = dev->data;
 
   data->file_index = 0;
 
@@ -126,8 +126,8 @@ static int sink_fs_open(const struct device *dev) {
   return open_new_file(dev);
 }
 
-static int sink_fs_process(const struct device *dev, struct net_buf *buf) {
-  struct sink_fs_data *data = dev->data;
+static int fs_sink_process(const struct device *dev, struct net_buf *buf) {
+  struct fs_sink_data *data = dev->data;
   int ret;
 
   if (should_rotate(dev, buf->len)) {
@@ -149,21 +149,21 @@ static int sink_fs_process(const struct device *dev, struct net_buf *buf) {
   return 0;
 }
 
-static int sink_fs_close(const struct device *dev) {
-  struct sink_fs_data *data = dev->data;
+static int fs_sink_close(const struct device *dev) {
+  struct fs_sink_data *data = dev->data;
 
   return fs_close(&data->current_file);
 }
 
-static const struct zstreamer_sink_driver_api sink_fs_api = {
-    .open = sink_fs_open,
-    .process = sink_fs_process,
-    .close = sink_fs_close,
+static const struct zstreamer_sink_driver_api fs_sink_api = {
+    .open = fs_sink_open,
+    .process = fs_sink_process,
+    .close = fs_sink_close,
 };
 
-int sink_fs_set_filename_handler(const struct device *dev,
-                                 sink_fs_filename_cb_t cb, void *user_data) {
-  struct sink_fs_data *data = dev->data;
+int fs_sink_set_filename_handler(const struct device *dev,
+                                 fs_sink_filename_cb_t cb, void *user_data) {
+  struct fs_sink_data *data = dev->data;
 
   data->filename_cb = cb;
   data->filename_cb_user_data = user_data;
@@ -171,16 +171,17 @@ int sink_fs_set_filename_handler(const struct device *dev,
   return 0;
 }
 
-#define SINK_FS_DEFINE(inst)                                                   \
+#define FS_SINK_DEFINE(inst)                                                   \
   BUILD_ASSERT(DT_INST_PROP(inst, delta_ms_threshold) != 0 ||                  \
                    DT_INST_PROP(inst, size_threshold) != 0,                    \
                "sink-fs: at least one rotation threshold must be "             \
                "non-zero");                                                    \
-  static struct sink_fs_data sink_fs_data_##inst = {                           \
+  ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst);                                     \
+  static struct fs_sink_data fs_sink_data_##inst = {                           \
       .common = Z_ZSTREAMER_SINK_DATA_INIT(                                    \
           inst, zstreamer_sink_stack_##inst),                                  \
   };                                                                           \
-  static const struct sink_fs_config sink_fs_config_##inst = {                 \
+  static const struct fs_sink_config fs_sink_config_##inst = {                 \
       .common = {Z_ZSTREAMER_SINK_CONFIG_INIT(                                 \
           DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
           DT_INST_PROP(inst, thread_priority))},                               \
@@ -188,7 +189,7 @@ int sink_fs_set_filename_handler(const struct device *dev,
       .delta_ms_threshold = DT_INST_PROP(inst, delta_ms_threshold),            \
       .size_threshold = DT_INST_PROP(inst, size_threshold),                    \
   };                                                                           \
-  ZSTREAMER_SINK_DT_INST_DEFINE(inst, NULL, &sink_fs_data_##inst,              \
-                                &sink_fs_config_##inst, &sink_fs_api);
+  ZSTREAMER_SINK_DT_INST_DEFINE(inst, NULL, &fs_sink_data_##inst,              \
+                                &fs_sink_config_##inst, &fs_sink_api);
 
-DT_INST_FOREACH_STATUS_OKAY(SINK_FS_DEFINE)
+DT_INST_FOREACH_STATUS_OKAY(FS_SINK_DEFINE)

@@ -46,7 +46,8 @@ static void source_thread_entry(void *p1, void *p2, void *p3) {
         continue;
       }
 
-      zstreamer_node_distribute(dev, buf, cfg->children, cfg->num_children);
+      zstreamer_node_distribute(dev, buf, cfg->common.children,
+                                cfg->common.num_children);
       k_yield();
     }
 

@@ -9,10 +9,3 @@ description: |
 compatible: "zstreamer,src"
 
 include: zstreamer,node.yaml
-
-properties:
-  children:
-    type: phandles
-    description: |
-      Downstream node(s) that this source sends buffers to.
-      For fan-out, list multiple phandles.

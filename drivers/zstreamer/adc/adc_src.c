@@ -18,10 +18,10 @@
 #include <zstreamer/source.h>
 
 #if defined(CONFIG_ZSTREAMER_ADC_STM32)
-#include "src_adc_stm32.h"
+#include "adc_src_stm32.h"
 #endif
 
-LOG_MODULE_REGISTER(src_adc, CONFIG_ZSTREAMER_LOG_LEVEL);
+LOG_MODULE_REGISTER(adc_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 #define DT_DRV_COMPAT zstreamer_adc_src
 
@@ -31,7 +31,7 @@ LOG_MODULE_REGISTER(src_adc, CONFIG_ZSTREAMER_LOG_LEVEL);
  * ============================================================================
  */
 
-struct src_adc_config {
+struct adc_src_config {
   struct zstreamer_source_config common;
 
   /* ADC device (from first io-channel) */
@@ -51,12 +51,12 @@ struct src_adc_config {
   uint16_t dma_buffer_samples;
 };
 
-struct src_adc_data {
+struct adc_src_data {
   struct zstreamer_source_data common;
 
   /* Platform-specific state */
 #if defined(CONFIG_ZSTREAMER_ADC_STM32)
-  struct src_adc_stm32_data stm32;
+  struct adc_src_stm32_data stm32;
 #endif
 
   /* Streaming state */
@@ -78,7 +78,7 @@ struct src_adc_data {
  */
 static void adc_buffer_ready_callback(void *user_data, const void *buffer,
                                       size_t num_samples, uint8_t channels) {
-  struct src_adc_data *data = user_data;
+  struct adc_src_data *data = user_data;
 
   /* Store buffer info and signal the streaming thread */
   data->ready_buffer = buffer;
@@ -97,9 +97,9 @@ static void adc_buffer_ready_callback(void *user_data, const void *buffer,
 /**
  * Initialize the ADC source node.
  */
-static int src_adc_init(const struct device *dev) {
-  const struct src_adc_config *cfg = dev->config;
-  struct src_adc_data *data = dev->data;
+static int adc_src_init(const struct device *dev) {
+  const struct adc_src_config *cfg = dev->config;
+  struct adc_src_data *data = dev->data;
   int ret;
 
   data->dev = dev;
@@ -121,7 +121,7 @@ static int src_adc_init(const struct device *dev) {
 
 #if defined(CONFIG_ZSTREAMER_ADC_STM32)
   /* Configure STM32-specific ADC capture */
-  struct src_adc_stm32_config stm32_cfg = {
+  struct adc_src_stm32_config stm32_cfg = {
       .adc_dev = cfg->adc_dev,
       .adc_channels = {cfg->adc_channels[0], cfg->adc_channels[1]},
       .num_channels = cfg->num_channels,
@@ -134,7 +134,7 @@ static int src_adc_init(const struct device *dev) {
       .user_data = data,
   };
 
-  ret = src_adc_stm32_init(&data->stm32, &stm32_cfg);
+  ret = adc_src_stm32_init(&data->stm32, &stm32_cfg);
   if (ret != 0) {
     LOG_ERR("Failed to initialize STM32 ADC: %d", ret);
     return ret;
@@ -153,12 +153,12 @@ static int src_adc_init(const struct device *dev) {
 /**
  * Open ADC capture hardware.
  */
-static int src_adc_open(const struct device *dev) {
-  struct src_adc_data *data = dev->data;
+static int adc_src_open(const struct device *dev) {
+  struct adc_src_data *data = dev->data;
   int ret;
 
 #if defined(CONFIG_ZSTREAMER_ADC_STM32)
-  ret = src_adc_stm32_start(&data->stm32);
+  ret = adc_src_stm32_start(&data->stm32);
 #else
   ret = -ENOTSUP;
 #endif
@@ -173,12 +173,12 @@ static int src_adc_open(const struct device *dev) {
 /**
  * Close ADC capture hardware.
  */
-static int src_adc_close(const struct device *dev) {
-  struct src_adc_data *data = dev->data;
+static int adc_src_close(const struct device *dev) {
+  struct adc_src_data *data = dev->data;
   int ret;
 
 #if defined(CONFIG_ZSTREAMER_ADC_STM32)
-  ret = src_adc_stm32_stop(&data->stm32);
+  ret = adc_src_stm32_stop(&data->stm32);
 #else
   ret = -ENOTSUP;
 #endif
@@ -196,9 +196,9 @@ static int src_adc_close(const struct device *dev) {
  * This waits for the DMA callback to signal buffer ready, then copies
  * the data into the provided streaming buffer.
  */
-static int src_adc_process(const struct device *dev, struct net_buf *buf) {
-  const struct src_adc_config *cfg = dev->config;
-  struct src_adc_data *data = dev->data;
+static int adc_src_process(const struct device *dev, struct net_buf *buf) {
+  const struct adc_src_config *cfg = dev->config;
+  struct adc_src_data *data = dev->data;
   int ret;
 
   /* Wait for buffer ready signal from DMA callback */
@@ -235,10 +235,10 @@ static int src_adc_process(const struct device *dev, struct net_buf *buf) {
  * ============================================================================
  */
 
-static const struct zstreamer_source_driver_api src_adc_api = {
-    .open = src_adc_open,
-    .close = src_adc_close,
-    .generate = src_adc_process,
+static const struct zstreamer_source_driver_api adc_src_api = {
+    .open = adc_src_open,
+    .close = adc_src_close,
+    .generate = adc_src_process,
 };
 
 /*
@@ -257,12 +257,13 @@ static const struct zstreamer_source_driver_api src_adc_api = {
 /* Helper macro to count io-channels */
 #define ADC_NUM_CHANNELS(node_id) MIN(DT_PROP_LEN(node_id, io_channels), 2)
 
-#define SRC_ADC_DEFINE(inst)                                                   \
-  static struct src_adc_data src_adc_data_##inst = {                           \
+#define ADC_SRC_DEFINE(inst)                                                   \
+  ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst);                                   \
+  static struct adc_src_data adc_src_data_##inst = {                           \
       .common = Z_ZSTREAMER_SOURCE_DATA_INIT(                                  \
           inst, zstreamer_source_stack_##inst),                                \
   };                                                                           \
-  static const struct src_adc_config src_adc_config_##inst = {                 \
+  static const struct adc_src_config adc_src_config_##inst = {                 \
       .common = {Z_ZSTREAMER_SOURCE_CONFIG_INIT(                               \
           inst, DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),      \
           DT_INST_PROP(inst, thread_priority))},                               \
@@ -281,8 +282,8 @@ static const struct zstreamer_source_driver_api src_adc_api = {
       .buffer_samples = DT_INST_PROP(inst, buffer_samples),                    \
       .dma_buffer_samples = DT_INST_PROP(inst, dma_buffer_samples),            \
   };                                                                           \
-  ZSTREAMER_SOURCE_DT_INST_DEFINE(inst, src_adc_init,                          \
-                                  &src_adc_data_##inst,                        \
-                                  &src_adc_config_##inst, &src_adc_api);
+  ZSTREAMER_SOURCE_DT_INST_DEFINE(inst, adc_src_init,                          \
+                                  &adc_src_data_##inst,                        \
+                                  &adc_src_config_##inst, &adc_src_api);
 
-DT_INST_FOREACH_STATUS_OKAY(SRC_ADC_DEFINE)
+DT_INST_FOREACH_STATUS_OKAY(ADC_SRC_DEFINE)

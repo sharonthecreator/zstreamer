@@ -26,13 +26,13 @@ extern "C" {
  * @param num_samples Number of samples (per channel) in the buffer
  * @param channels Number of channels (1 or 2)
  */
-typedef void (*src_adc_stm32_callback_t)(void *user_data, const void *buffer,
+typedef void (*adc_src_stm32_callback_t)(void *user_data, const void *buffer,
                                          size_t num_samples, uint8_t channels);
 
 /**
  * @brief ADC capture configuration
  */
-struct src_adc_stm32_config {
+struct adc_src_stm32_config {
   /** ADC device (from io-channels) */
   const struct device *adc_dev;
 
@@ -58,7 +58,7 @@ struct src_adc_stm32_config {
   uint16_t dma_buffer_samples;
 
   /** Callback when buffer half is ready */
-  src_adc_stm32_callback_t callback;
+  adc_src_stm32_callback_t callback;
 
   /** User data for callback */
   void *user_data;
@@ -67,9 +67,9 @@ struct src_adc_stm32_config {
 /**
  * @brief Runtime state for ADC capture
  */
-struct src_adc_stm32_data {
+struct adc_src_stm32_data {
   /** Configuration (copied from init) */
-  struct src_adc_stm32_config cfg;
+  struct adc_src_stm32_config cfg;
 
   /** DMA buffer (allocated in non-cacheable region) */
   void *dma_buffer;
@@ -94,8 +94,8 @@ struct src_adc_stm32_data {
  * @param cfg Configuration parameters
  * @return 0 on success, negative errno on failure
  */
-int src_adc_stm32_init(struct src_adc_stm32_data *data,
-                       const struct src_adc_stm32_config *cfg);
+int adc_src_stm32_init(struct adc_src_stm32_data *data,
+                       const struct adc_src_stm32_config *cfg);
 
 /**
  * @brief Start ADC capture
@@ -107,7 +107,7 @@ int src_adc_stm32_init(struct src_adc_stm32_data *data,
  * @param data Runtime data
  * @return 0 on success, negative errno on failure
  */
-int src_adc_stm32_start(struct src_adc_stm32_data *data);
+int adc_src_stm32_start(struct adc_src_stm32_data *data);
 
 /**
  * @brief Stop ADC capture
@@ -117,7 +117,7 @@ int src_adc_stm32_start(struct src_adc_stm32_data *data);
  * @param data Runtime data
  * @return 0 on success, negative errno on failure
  */
-int src_adc_stm32_stop(struct src_adc_stm32_data *data);
+int adc_src_stm32_stop(struct adc_src_stm32_data *data);
 
 /**
  * @brief Deinitialize STM32 ADC capture
@@ -126,7 +126,7 @@ int src_adc_stm32_stop(struct src_adc_stm32_data *data);
  *
  * @param data Runtime data
  */
-void src_adc_stm32_deinit(struct src_adc_stm32_data *data);
+void adc_src_stm32_deinit(struct adc_src_stm32_data *data);
 
 #ifdef __cplusplus
 }

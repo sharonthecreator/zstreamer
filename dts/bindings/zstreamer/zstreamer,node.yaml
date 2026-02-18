@@ -5,7 +5,7 @@ description: |
   Base binding for zstreamer streaming node devices.
   All zstreamer node driver bindings should include this file
   (via one of the type-specific intermediaries: src, sink,
-  processor, or filter).
+  or filter) or directly for through-nodes.
 
 compatible: "zstreamer,node"
 
@@ -21,3 +21,10 @@ properties:
     type: int
     default: 5
     description: Priority of the node thread.
+
+  children:
+    type: phandles
+    description: |
+      Downstream node(s) that this node sends buffers to.
+      For fan-out, list multiple phandles.
+      Optional — sinks and leaf nodes omit this property.

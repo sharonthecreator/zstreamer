@@ -10,6 +10,5 @@ zephyr_library_sources(
   node.c
   source.c
   sink.c
-  processor.c
   filter.c
 )

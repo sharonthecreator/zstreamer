@@ -5,5 +5,5 @@ zephyr_library()
 
 zephyr_include_directories(${ZEPHYR_ZSTREAMER_MODULE_DIR}/include)
 
-zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_SPI_SRC src_spi.c)
-zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_SPI_SINK sink_spi.c)
+zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_SPI_SRC spi_src.c)
+zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_SPI_SINK spi_sink.c)

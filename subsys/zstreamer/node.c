@@ -100,6 +100,60 @@ int zstreamer_node_base_init(const struct device *dev,
 }
 
 /* ------------------------------------------------------------------ */
+/* Through-node thread entry                                           */
+/* ------------------------------------------------------------------ */
+
+static void node_thread_entry(void *p1, void *p2, void *p3) {
+  const struct device *dev = (const struct device *)p1;
+  struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
+  const struct zstreamer_node_config *cfg =
+      (const struct zstreamer_node_config *)dev->config;
+  const struct zstreamer_node_driver_api *api =
+      (const struct zstreamer_node_driver_api *)dev->api;
+
+  ARG_UNUSED(p2);
+  ARG_UNUSED(p3);
+
+  while (true) {
+    struct net_buf *buf = k_fifo_get(&data->fifo, K_FOREVER);
+
+    if (buf == NULL) {
+      continue;
+    }
+
+    int ret = api->process(dev, buf);
+
+    if (ret != 0) {
+      LOG_ERR("[%s] process error: %d", dev->name, ret);
+      net_buf_unref(buf);
+      continue;
+    }
+
+    zstreamer_node_distribute(dev, buf, cfg->children, cfg->num_children);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Through-node common init                                            */
+/* ------------------------------------------------------------------ */
+
+int zstreamer_node_common_init(const struct device *dev) {
+  const struct zstreamer_node_driver_api *api =
+      (const struct zstreamer_node_driver_api *)dev->api;
+
+  if (api->open != NULL) {
+    int ret = api->open(dev);
+
+    if (ret != 0) {
+      LOG_ERR("[%s] open failed: %d", dev->name, ret);
+      return ret;
+    }
+  }
+
+  return zstreamer_node_base_init(dev, node_thread_entry);
+}
+
+/* ------------------------------------------------------------------ */
 /* Buffer allocation                                                   */
 /* ------------------------------------------------------------------ */
 

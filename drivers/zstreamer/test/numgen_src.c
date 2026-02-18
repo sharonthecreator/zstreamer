@@ -6,46 +6,51 @@
 #define DT_DRV_COMPAT zstreamer_numgen_src
 
 #include <zephyr/device.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
 #include <zstreamer/source.h>
 
-LOG_MODULE_REGISTER(src_numgen, CONFIG_ZSTREAMER_LOG_LEVEL);
+LOG_MODULE_REGISTER(numgen_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 
-struct src_numgen_config {
+struct numgen_src_config {
   struct zstreamer_source_config common;
 };
 
-struct src_numgen_data {
+struct numgen_src_data {
   struct zstreamer_source_data common;
   uint8_t counter;
 };
 
-static int src_numgen_process(const struct device *dev, struct net_buf *buf) {
-  struct src_numgen_data *data = dev->data;
+static int numgen_src_process(const struct device *dev, struct net_buf *buf) {
+  struct numgen_src_data *data = dev->data;
 
   while (net_buf_tailroom(buf) > 0) {
     net_buf_add_u8(buf, data->counter++);
   }
 
+  /* Allow simulated time to advance on native_sim / POSIX targets. */
+  k_sleep(K_MSEC(1));
+
   return 0;
 }
 
-static const struct zstreamer_source_driver_api src_numgen_api = {
-    .generate = src_numgen_process,
+static const struct zstreamer_source_driver_api numgen_src_api = {
+    .generate = numgen_src_process,
 };
 
-#define SRC_NUMGEN_DEFINE(inst)                                                \
-  static struct src_numgen_data src_numgen_data_##inst = {                     \
+#define NUMGEN_SRC_DEFINE(inst)                                                \
+  ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst);                                   \
+  static struct numgen_src_data numgen_src_data_##inst = {                     \
       .common = Z_ZSTREAMER_SOURCE_DATA_INIT(                                  \
           inst, zstreamer_source_stack_##inst),                                \
   };                                                                           \
-  static const struct src_numgen_config src_numgen_config_##inst = {           \
+  static const struct numgen_src_config numgen_src_config_##inst = {           \
       .common = {Z_ZSTREAMER_SOURCE_CONFIG_INIT(                               \
           inst, DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),      \
           DT_INST_PROP(inst, thread_priority))},                               \
   };                                                                           \
-  ZSTREAMER_SOURCE_DT_INST_DEFINE(inst, NULL, &src_numgen_data_##inst,         \
-                                  &src_numgen_config_##inst, &src_numgen_api);
+  ZSTREAMER_SOURCE_DT_INST_DEFINE(inst, NULL, &numgen_src_data_##inst,         \
+                                  &numgen_src_config_##inst, &numgen_src_api);
 
-DT_INST_FOREACH_STATUS_OKAY(SRC_NUMGEN_DEFINE)
+DT_INST_FOREACH_STATUS_OKAY(NUMGEN_SRC_DEFINE)

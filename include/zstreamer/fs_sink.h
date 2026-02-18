@@ -8,8 +8,8 @@
  * @brief Public API for the file system sink zstreamer node driver
  */
 
-#ifndef ZSTREAMER_SINK_FS_H_
-#define ZSTREAMER_SINK_FS_H_
+#ifndef ZSTREAMER_FS_SINK_H_
+#define ZSTREAMER_FS_SINK_H_
 
 #include <stddef.h>
 #include <zephyr/device.h>
@@ -27,7 +27,7 @@ extern "C" {
  * @param user_data  User-provided context pointer.
  * @return 0 on success, negative errno on failure.
  */
-typedef int (*sink_fs_filename_cb_t)(const struct device *dev, char *buf,
+typedef int (*fs_sink_filename_cb_t)(const struct device *dev, char *buf,
                                      size_t buf_size, void *user_data);
 
 /**
@@ -41,11 +41,11 @@ typedef int (*sink_fs_filename_cb_t)(const struct device *dev, char *buf,
  * @param user_data  Opaque pointer passed to the callback.
  * @return 0 on success, negative errno on failure.
  */
-int sink_fs_set_filename_handler(const struct device *dev,
-                                 sink_fs_filename_cb_t cb, void *user_data);
+int fs_sink_set_filename_handler(const struct device *dev,
+                                 fs_sink_filename_cb_t cb, void *user_data);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* ZSTREAMER_SINK_FS_H_ */
+#endif /* ZSTREAMER_FS_SINK_H_ */

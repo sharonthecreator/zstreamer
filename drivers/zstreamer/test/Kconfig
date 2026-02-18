@@ -21,3 +21,30 @@ config ZSTREAMER_TEST_FAKE_SINK
 	help
 	  Enable the fake sink streaming node driver.
 	  Discards all received buffer data.
+
+config ZSTREAMER_TEST_COUNT_SINK
+	bool "Counting sink driver"
+	depends on DT_HAS_ZSTREAMER_COUNT_SINK_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_TEST
+	help
+	  Enable the counting sink streaming node driver.
+	  Counts received buffers and bytes via atomics.
+
+config ZSTREAMER_TEST_PASSTHROUGH_NODE
+	bool "Passthrough through-node driver"
+	depends on DT_HAS_ZSTREAMER_PASSTHROUGH_NODE_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_TEST
+	help
+	  Enable the passthrough through-node streaming node driver.
+	  Forwards buffers unchanged to children.
+
+config ZSTREAMER_TEST_ODD_FILTER
+	bool "Odd-byte filter driver"
+	depends on DT_HAS_ZSTREAMER_ODD_FILTER_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_TEST
+	help
+	  Enable the odd-byte filter streaming node driver.
+	  Routes buffers based on whether the first byte is odd or even.

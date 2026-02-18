@@ -10,38 +10,39 @@
 
 #include <zstreamer/sink.h>
 
-LOG_MODULE_REGISTER(sink_fake, CONFIG_ZSTREAMER_LOG_LEVEL);
+LOG_MODULE_REGISTER(fake_sink, CONFIG_ZSTREAMER_LOG_LEVEL);
 
-struct sink_fake_config {
+struct fake_sink_config {
   struct zstreamer_sink_config common;
 };
 
-struct sink_fake_data {
+struct fake_sink_data {
   struct zstreamer_sink_data common;
 };
 
-static int sink_fake_process(const struct device *dev, struct net_buf *buf) {
+static int fake_sink_process(const struct device *dev, struct net_buf *buf) {
   ARG_UNUSED(dev);
   ARG_UNUSED(buf);
 
   return 0;
 }
 
-static const struct zstreamer_sink_driver_api sink_fake_api = {
-    .process = sink_fake_process,
+static const struct zstreamer_sink_driver_api fake_sink_api = {
+    .process = fake_sink_process,
 };
 
-#define SINK_FAKE_DEFINE(inst)                                                 \
-  static struct sink_fake_data sink_fake_data_##inst = {                       \
+#define FAKE_SINK_DEFINE(inst)                                                 \
+  ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst);                                     \
+  static struct fake_sink_data fake_sink_data_##inst = {                       \
       .common = Z_ZSTREAMER_SINK_DATA_INIT(                                    \
           inst, zstreamer_sink_stack_##inst),                                  \
   };                                                                           \
-  static const struct sink_fake_config sink_fake_config_##inst = {             \
+  static const struct fake_sink_config fake_sink_config_##inst = {             \
       .common = {Z_ZSTREAMER_SINK_CONFIG_INIT(                                 \
           DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
           DT_INST_PROP(inst, thread_priority))},                               \
   };                                                                           \
-  ZSTREAMER_SINK_DT_INST_DEFINE(inst, NULL, &sink_fake_data_##inst,            \
-                                &sink_fake_config_##inst, &sink_fake_api);
+  ZSTREAMER_SINK_DT_INST_DEFINE(inst, NULL, &fake_sink_data_##inst,            \
+                                &fake_sink_config_##inst, &fake_sink_api);
 
-DT_INST_FOREACH_STATUS_OKAY(SINK_FAKE_DEFINE)
+DT_INST_FOREACH_STATUS_OKAY(FAKE_SINK_DEFINE)

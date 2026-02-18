@@ -59,7 +59,8 @@ __subsystem struct zstreamer_sink_driver_api {
 extern int zstreamer_sink_common_init(const struct device *dev);
 
 #define Z_ZSTREAMER_SINK_CONFIG_INIT(node_id, _stack_size, _prio)              \
-  .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(node_id, _stack_size, _prio)}
+  .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(node_id, _stack_size, _prio,         \
+      NULL, 0)}
 
 #define Z_ZSTREAMER_SINK_DATA_INIT(inst, _stack)                               \
   {                                                                            \
@@ -79,14 +80,27 @@ extern int zstreamer_sink_common_init(const struct device *dev);
   }
 
 /**
+ * @brief Pre-define the thread stack for a sink node instance.
+ *
+ * Call this BEFORE defining the driver's data struct so the stack
+ * symbol is visible to the initialiser.
+ */
+#define ZSTREAMER_SINK_DT_PRE_DEFINE(inst, node_id)                            \
+  static K_THREAD_STACK_DEFINE(zstreamer_sink_stack_##inst,                    \
+                               DT_PROP(node_id, thread_stack_size))
+
+#define ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst)                                \
+  ZSTREAMER_SINK_DT_PRE_DEFINE(inst, DT_DRV_INST(inst))
+
+/**
  * @brief Define a zstreamer sink node device from a DT node identifier.
  *
  * No children array is generated — sinks are terminal.
+ * The thread stack must already have been emitted with
+ * ZSTREAMER_SINK_DT_PRE_DEFINE / ZSTREAMER_SINK_DT_INST_PRE_DEFINE.
  */
 #define ZSTREAMER_SINK_DT_DEFINE(inst, node_id, init_fn, data_ptr, cfg_ptr,    \
                                   api_ptr)                                      \
-  static K_THREAD_STACK_DEFINE(zstreamer_sink_stack_##inst,                    \
-                               DT_PROP(node_id, thread_stack_size));           \
   Z_ZSTREAMER_SINK_INIT_WRAPPER_DEFINE(inst, init_fn)                          \
   DEVICE_DT_DEFINE(node_id, zstreamer_sink_init_##inst, NULL, data_ptr,        \
                    cfg_ptr, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,   \

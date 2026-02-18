@@ -11,14 +11,14 @@
 
 #include <zstreamer/sink.h>
 
-LOG_MODULE_REGISTER(sink_spi, CONFIG_ZSTREAMER_LOG_LEVEL);
+LOG_MODULE_REGISTER(spi_sink, CONFIG_ZSTREAMER_LOG_LEVEL);
 
-struct sink_spi_config {
+struct spi_sink_config {
   struct zstreamer_sink_config common;
   struct spi_dt_spec spi;
 };
 
-struct sink_spi_data {
+struct spi_sink_data {
   struct zstreamer_sink_data common;
 #if defined(CONFIG_SPI_ASYNC)
   struct k_poll_signal sig;
@@ -29,10 +29,10 @@ struct sink_spi_data {
 
 #if defined(CONFIG_SPI_ASYNC)
 
-static int sink_spi_process_async(const struct device *dev,
+static int spi_sink_process_async(const struct device *dev,
                                   struct net_buf *buf) {
-  const struct sink_spi_config *cfg = dev->config;
-  struct sink_spi_data *data = dev->data;
+  const struct spi_sink_config *cfg = dev->config;
+  struct spi_sink_data *data = dev->data;
   int ret, result;
 
   if (buf->len == 0) {
@@ -71,9 +71,9 @@ static int sink_spi_process_async(const struct device *dev,
   return result;
 }
 
-static int sink_spi_open_async(const struct device *dev) {
-  const struct sink_spi_config *cfg = dev->config;
-  struct sink_spi_data *data = dev->data;
+static int spi_sink_open_async(const struct device *dev) {
+  const struct spi_sink_config *cfg = dev->config;
+  struct spi_sink_data *data = dev->data;
   uint8_t dummy = 0;
   struct spi_buf test_buf = {.buf = &dummy, .len = 1};
   struct spi_buf_set test_bufs = {.buffers = &test_buf, .count = 1};
@@ -103,9 +103,9 @@ static int sink_spi_open_async(const struct device *dev) {
 
 #endif /* CONFIG_SPI_ASYNC */
 
-static int sink_spi_process_poll(const struct device *dev,
+static int spi_sink_process_poll(const struct device *dev,
                                  struct net_buf *buf) {
-  const struct sink_spi_config *cfg = dev->config;
+  const struct spi_sink_config *cfg = dev->config;
 
   if (buf->len == 0) {
     return 0;
@@ -123,69 +123,70 @@ static int sink_spi_process_poll(const struct device *dev,
   return spi_write_dt(&cfg->spi, &tx_bufs);
 }
 
-static int sink_spi_process(const struct device *dev, struct net_buf *buf) {
+static int spi_sink_process(const struct device *dev, struct net_buf *buf) {
 #if defined(CONFIG_SPI_ASYNC)
-  struct sink_spi_data *data = dev->data;
+  struct spi_sink_data *data = dev->data;
 
   if (data->async_enabled) {
-    return sink_spi_process_async(dev, buf);
+    return spi_sink_process_async(dev, buf);
   }
 #endif
-  return sink_spi_process_poll(dev, buf);
+  return spi_sink_process_poll(dev, buf);
 }
 
-static int sink_spi_open(const struct device *dev) {
+static int spi_sink_open(const struct device *dev) {
 #if defined(CONFIG_SPI_ASYNC)
-  sink_spi_open_async(dev);
+  spi_sink_open_async(dev);
 #endif
   return 0;
 }
 
-static int sink_spi_close(const struct device *dev) {
+static int spi_sink_close(const struct device *dev) {
 #if defined(CONFIG_SPI_ASYNC)
-  struct sink_spi_data *data = dev->data;
+  struct spi_sink_data *data = dev->data;
 
   data->async_enabled = false;
 #endif
   return 0;
 }
 
-static const struct zstreamer_sink_driver_api sink_spi_api = {
-    .open = sink_spi_open,
-    .close = sink_spi_close,
-    .process = sink_spi_process,
+static const struct zstreamer_sink_driver_api spi_sink_api = {
+    .open = spi_sink_open,
+    .close = spi_sink_close,
+    .process = spi_sink_process,
 };
 
 #if defined(CONFIG_SPI_ASYNC)
-static int sink_spi_init(const struct device *dev) {
-  struct sink_spi_data *data = dev->data;
+static int spi_sink_init(const struct device *dev) {
+  struct spi_sink_data *data = dev->data;
 
   k_poll_signal_init(&data->sig);
   k_poll_event_init(&data->evt, K_POLL_TYPE_SIGNAL, K_POLL_MODE_NOTIFY_ONLY,
                     &data->sig);
   return 0;
 }
-#define SINK_SPI_INIT_FN sink_spi_init
+#define SPI_SINK_INIT_FN spi_sink_init
 #else
-#define SINK_SPI_INIT_FN NULL
+#define SPI_SINK_INIT_FN NULL
 #endif
 
 #define SPI_DEV_NODE(inst) DT_INST_PHANDLE(inst, spi_device)
 
-#define SINK_SPI_DEFINE(inst)                                                  \
-  static struct sink_spi_data sink_spi_data_##inst = {                         \
+#define SPI_SINK_DEFINE(inst)                                                  \
+  ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst);                                     \
+  static struct spi_sink_data spi_sink_data_##inst = {                         \
       .common = Z_ZSTREAMER_SINK_DATA_INIT(                                    \
           inst, zstreamer_sink_stack_##inst),                                  \
   };                                                                           \
-  static const struct sink_spi_config sink_spi_config_##inst = {               \
+  static const struct spi_sink_config spi_sink_config_##inst = {               \
       .common = {Z_ZSTREAMER_SINK_CONFIG_INIT(                                 \
           DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
           DT_INST_PROP(inst, thread_priority))},                               \
       .spi = SPI_DT_SPEC_GET(SPI_DEV_NODE(inst),                               \
                              SPI_OP_MODE_MASTER | SPI_WORD_SET(8), 0),         \
   };                                                                           \
-  ZSTREAMER_SINK_DT_INST_DEFINE(inst, SINK_SPI_INIT_FN,                        \
-                                &sink_spi_data_##inst,                         \
-                                &sink_spi_config_##inst, &sink_spi_api);
+  ZSTREAMER_SINK_DT_INST_DEFINE(inst, SPI_SINK_INIT_FN,                        \
+                                &spi_sink_data_##inst,                         \
+                                &spi_sink_config_##inst, &spi_sink_api);
 
-DT_INST_FOREACH_STATUS_OKAY(SINK_SPI_DEFINE)
+DT_INST_FOREACH_STATUS_OKAY(SPI_SINK_DEFINE)

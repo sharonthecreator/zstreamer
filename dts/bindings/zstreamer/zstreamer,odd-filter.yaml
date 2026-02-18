@@ -1,0 +1,10 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Odd-byte filter node. Returns true if the first byte of a buffer
+  is odd, false if even. Software-only test node.
+
+compatible: "zstreamer,odd-filter"
+
+include: zstreamer,filter.yaml

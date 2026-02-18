@@ -1,0 +1,10 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Counting sink node. Counts received buffers and bytes via atomics.
+  Software-only test node.
+
+compatible: "zstreamer,count-sink"
+
+include: zstreamer,sink.yaml

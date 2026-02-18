@@ -12,11 +12,6 @@ compatible: "zstreamer,filter"
 include: zstreamer,node.yaml
 
 properties:
-  children:
-    type: phandles
-    description: |
-      Downstream node(s) for the filter-true path.
-
   false-children:
     type: phandles
     description: |
