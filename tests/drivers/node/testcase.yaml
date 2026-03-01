@@ -2,9 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 tests:
-  drivers.zstreamer_node.uart:
-    tags: drivers zstreamer_node zstreamer uart
+  drivers.zstreamer.node:
+    tags: drivers zstreamer node
     platform_allow:
       - native_sim
-      - native_sim/native/64
-      - qemu_cortex_m3

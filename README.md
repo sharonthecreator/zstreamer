@@ -370,12 +370,96 @@ Where `<TYPE>` is `NODE`, `SOURCE`, `SINK`, or `FILTER` (upper-case for macros).
 
 ## Tests
 
-| Suite | Location | Notes |
-|-------|----------|-------|
-| Node/UART | `tests/drivers/node` | Passing on native_sim/native/64 |
-| Node/SPI | `tests/drivers/node_spi` | Passing on native_sim/native/64 |
+All test suites target `native_sim` only. On macOS, use Docker
+(`zephyrprojectrtos/zephyr-build`) for builds.
 
-On macOS, use Docker (`zephyrprojectrtos/zephyr-build`) for `native_sim/native/64` builds.
+Shared test helpers live in `tests/include/zstreamer_test/helpers.h`
+(`pattern_byte()` deterministic byte generator used by UART and SPI stress tests).
+
+### UART (`tests/drivers/uart/`)
+
+Pipeline: `uart-src` (UART emulator) -> `uart-sink` (UART emulator).
+Twister ID: `drivers.zstreamer.uart`
+
+| # | Test | Description |
+|---|------|-------------|
+| 1 | `test_devices_ready` | Graph, source, sink, UART src, UART sink devices are ready |
+| 2 | `test_start_stop` | Strict start/stop: first start->0, second->-EALREADY, first stop->0, second->-EALREADY |
+| 3 | `test_buf_alloc` | Allocate buffer from graph pool, verify tailroom, free |
+| 4 | `test_uart_relay` | Relay 5 bytes ("hello") through pipeline, verify exact match |
+| 5 | `test_long_transfer` | 200-byte multi-buffer transfer |
+| 6 | `test_burst_writes` | 5x3-byte writes with delays, verify concatenated output |
+| 7 | `test_restart_cycle` | 5 start/transfer/stop cycles with 2-byte pattern |
+| 8 | `test_throughput_stress` | 256-byte max-throughput transfer with pattern verification |
+| 9 | `test_1mb_transfer` | 1 MiB streamed in 4 KiB chunks, every byte verified via `pattern_byte()` |
+| 10 | `test_2mb_varied_chunks` | 2 MiB with alternating chunk sizes (137, 4096, 1, 8192, 53, 2048, 7, 512) |
+
+### SPI (`tests/drivers/spi/`)
+
+Pipeline: `spi-src` (SPI emulator) -> `spi-sink` (SPI emulator).
+Uses a custom `spi-test-peripheral` emulator with 4 KiB ring buffers.
+Twister ID: `drivers.zstreamer.spi`
+
+| # | Test | Description |
+|---|------|-------------|
+| 1 | `test_devices_ready` | Graph, SPI source, SPI sink, SPI rx/tx peripherals are ready |
+| 2 | `test_start_stop` | Strict start/stop state machine |
+| 3 | `test_buf_alloc` | Allocate buffer, verify tailroom, free |
+| 4 | `test_spi_relay` | 9-byte relay through SPI, verify first N bytes match |
+| 5 | `test_spi_long_transfer` | 256-byte multi-frame transfer (4x 64-byte reads) |
+| 6 | `test_spi_restart_cycle` | 5 start/stop/transfer cycles with 8-byte pattern |
+| 7 | `test_spi_stress` | 1024-byte / 16-frame stress test |
+| 8 | `test_spi_large_verified` | 4 KiB with per-byte pattern verification |
+| 9 | `test_spi_64kb_streamed` | 64 KiB continuous feed/drain in 1536-byte chunks |
+| 10 | `test_spi_96kb_varied_chunks` | 96 KiB with mixed chunk sizes (64, 137, 511, 1024, 2048, 777, 1536) |
+
+### Source (`tests/drivers/source/`)
+
+Pipeline: `numgen-src` -> `count-sink`.
+Twister ID: `drivers.zstreamer.source`
+
+| # | Test | Description |
+|---|------|-------------|
+| 1 | `test_devices_ready` | Graph, numgen source, count sink are ready |
+| 2 | `test_start_stop` | Strict: first start->0, second->-EALREADY, first stop->0, second->-EALREADY |
+| 3 | `test_buf_alloc` | Allocate buffer from pool, verify tailroom, free |
+| 4 | `test_data_flow` | Run pipeline 200 ms, verify count sink received >0 buffers |
+| 5 | `test_restart_cycle` | 5 start/stop cycles, verify buffers flow each time |
+
+### Sink (`tests/drivers/sink/`)
+
+Pipeline: `numgen-src` -> `count-sink`.
+Twister ID: `drivers.zstreamer.sink`
+
+| # | Test | Description |
+|---|------|-------------|
+| 1 | `test_devices_ready` | Graph, numgen source, count sink are ready |
+| 2 | `test_buf_alloc` | Allocate buffer, verify tailroom, free |
+| 3 | `test_sink_processes_data` | Run pipeline 200 ms, verify sink received >0 buffers |
+| 4 | `test_sink_byte_count` | Verify bytes == bufs x buffer_size (64) |
+
+### Node / Processor (`tests/drivers/node/`)
+
+Pipeline: `numgen-src` -> `passthrough` (processor) -> `count-sink`.
+Twister ID: `drivers.zstreamer.node`
+
+| # | Test | Description |
+|---|------|-------------|
+| 1 | `test_devices_ready` | Graph, source, passthrough processor, count sink are ready |
+| 2 | `test_pipeline_flow` | Run 200 ms, verify buffers passed through processor to sink |
+| 3 | `test_processor_restart_cycle` | 5 start/stop cycles, verify buffers flow through processor each time |
+
+### Filter (`tests/drivers/filter/`)
+
+Pipeline: `numgen-src` -> `odd-filter` -> `{true-sink, false-sink}`.
+Twister ID: `drivers.zstreamer.filter`
+
+| # | Test | Description |
+|---|------|-------------|
+| 1 | `test_devices_ready` | Graph, source, odd-filter, true sink, false sink are ready |
+| 2 | `test_filter_routing` | Run 200 ms, verify both true and false paths received buffers |
+| 3 | `test_filter_balanced` | Verify true/false paths differ by at most 1 buffer |
+| 4 | `test_filter_restart_cycle` | 5 start/stop cycles, verify both paths active each time |
 
 ## Build examples
 
@@ -384,8 +468,12 @@ On macOS, use Docker (`zephyrprojectrtos/zephyr-build`) for `native_sim/native/6
 west build -b nucleo_u575zi_q samples/uart2uart
 
 # Test builds (native_sim)
-west build -b native_sim/native/64 tests/drivers/node_spi
-west build -b native_sim/native/64 tests/drivers/node
+west build -b native_sim tests/drivers/uart
+west build -b native_sim tests/drivers/spi
+west build -b native_sim tests/drivers/source
+west build -b native_sim tests/drivers/sink
+west build -b native_sim tests/drivers/node
+west build -b native_sim tests/drivers/filter
 ```
 
 ## Module integration

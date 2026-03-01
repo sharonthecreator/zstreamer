@@ -18,6 +18,8 @@
 #include <zstreamer/node.h>
 #include <zstreamer/source.h>
 
+#include <zstreamer_test/helpers.h>
+
 #include "spi_test_peripheral.h"
 
 #define GRAPH_NODE DT_NODELABEL(spi_streaming_graph)
@@ -224,10 +226,6 @@ ZTEST(zstreamer_node_spi, test_spi_stress) {
 /* ------------------------------------------------------------------ */
 /* Pattern verification for large transfers                            */
 /* ------------------------------------------------------------------ */
-
-static inline uint8_t pattern_byte(uint32_t pos) {
-  return (uint8_t)((pos * 131u + 17u) & 0xffu);
-}
 
 static void run_large_spi_transfer(uint32_t total, uint32_t chunk) {
   static uint8_t tx_buf[2048];

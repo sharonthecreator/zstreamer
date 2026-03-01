@@ -7,9 +7,10 @@ cmake_minimum_required(VERSION 3.20.0)
 list(APPEND DTS_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(zstreamer_node_spi_test)
+project(zstreamer_spi_test)
 
 target_sources(app PRIVATE
   src/main.c
   src/spi_test_peripheral.c
 )
+target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
