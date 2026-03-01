@@ -25,5 +25,5 @@
 - The `streaming-graph` node does NOT use `#address-cells`/`#size-cells`/`reg` — child zstnodes use plain names (no `@N` suffix)
 - Zephyr SPI emulator (`zephyr,spi-emul-controller`) does NOT support async/signal mode - only sync `transceive`. Tests on native_sim can only test the polling path.
 - Zephyr SPI async uses `k_poll_signal` (not callbacks). Pattern: init signal, pass to `spi_*_signal()`, wait with `k_poll()`, reset signal before reuse.
-- Fixed: `tests/drivers/node` previously hung in `test_numgen_fakesink_restart_cycle` because numgen's tight generate loop prevented simulated time from advancing on native_sim. Fix: added `k_sleep(K_MSEC(1))` in `src_numgen_process()`.
+- Fixed: `tests/drivers/node` previously hung in `test_numgen_fakesink_restart_cycle` because numgen's tight generate loop prevented simulated time from advancing on native_sim. Fix: added `k_sleep(K_MSEC(1))` in `numgen_src_process()`.
 - Fixed: All driver DEFINE macros had a forward-reference issue — data/config structs referenced stack/children arrays defined later by `ZSTREAMER_*_DT_DEFINE`. Fix: added `ZSTREAMER_*_DT_INST_PRE_DEFINE()` macros that emit stack/children first; every driver calls this before its data/config struct definitions.

@@ -6,8 +6,8 @@
 #ifndef ZSTREAMER_TEST_COUNT_SINK_H_
 #define ZSTREAMER_TEST_COUNT_SINK_H_
 
-#include <zephyr/device.h>
 #include <stdint.h>
+#include <zephyr/device.h>
 
 #ifdef __cplusplus
 extern "C" {

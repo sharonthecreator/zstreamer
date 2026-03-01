@@ -39,54 +39,66 @@ struct zstreamer_filter_data {
 };
 
 /**
- * @brief Filter node driver API.
+ * @brief Thread entry for filter nodes.
  *
- * @param open   Optional. Called at boot to set up hardware.
- * @param close  Optional. Called for cleanup.
- * @param filter Required. Called for each received buffer. Return true
- *               to distribute to children, false to distribute to
- *               false-children.
+ * Declared here so ZSTREAMER_FILTER_CONFIG_INIT can reference it.
  */
-__subsystem struct zstreamer_filter_driver_api {
-  int (*open)(const struct device *dev);
-  int (*close)(const struct device *dev);
-  bool (*filter)(const struct device *dev, struct net_buf *buf);
-};
+extern void zstreamer_filter_thread_entry(void *p1, void *p2, void *p3);
 
-/** @cond INTERNAL_HIDDEN */
+/**
+ * @brief Filter node config initializer.
+ *
+ * Produces a braced initializer value for struct zstreamer_filter_config.
+ * Requires ZSTREAMER_FILTER_DT_INST_PRE_DEFINE(inst) to have been called
+ * earlier so that the children and false-children array symbols are visible.
+ * Initializes both the normal children (routed on process() returning 1)
+ * and the false-children (routed on process() returning 0).
+ *
+ * Usage: .common = ZSTREAMER_FILTER_CONFIG_INIT(inst),
+ *
+ * @param inst  Devicetree instance number.
+ */
+#define ZSTREAMER_FILTER_CONFIG_INIT(inst)                                     \
+  {.common = {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(                               \
+       DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),               \
+       DT_INST_PROP(inst, thread_priority), zstreamer_filter_children_##inst,  \
+       Z_ZSTREAMER_NUM_CHILDREN(DT_DRV_INST(inst)),                            \
+       zstreamer_filter_thread_entry)},                                        \
+   .false_children = zstreamer_filter_false_children_##inst,                   \
+   .num_false_children = Z_ZSTREAMER_NUM_FALSE_CHILDREN(DT_DRV_INST(inst))}
 
-extern int zstreamer_filter_common_init(const struct device *dev);
-
-#define Z_ZSTREAMER_FILTER_CONFIG_INIT(inst, node_id, _stack_size, _prio)      \
-  .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(node_id, _stack_size, _prio,         \
-      zstreamer_filter_children_##inst, Z_ZSTREAMER_NUM_CHILDREN(node_id))},   \
-  .false_children = zstreamer_filter_false_children_##inst,                    \
-  .num_false_children = Z_ZSTREAMER_NUM_FALSE_CHILDREN(node_id)
-
-#define Z_ZSTREAMER_FILTER_DATA_INIT(inst, _stack)                             \
+/**
+ * @brief Filter node data initializer.
+ *
+ * Produces a braced initializer value for struct zstreamer_filter_data.
+ * Requires ZSTREAMER_FILTER_DT_INST_PRE_DEFINE(inst) to have been called
+ * earlier so that the stack symbol is visible.  Zephyr runtime fields
+ * are initialized later by zstreamer_node_common_init().
+ *
+ * Usage: .common = ZSTREAMER_FILTER_DATA_INIT(inst),
+ *
+ * @param inst  Devicetree instance number.
+ */
+#define ZSTREAMER_FILTER_DATA_INIT(inst)                                       \
   {                                                                            \
-      .common = Z_ZSTREAMER_NODE_DATA_INIT(_stack),                            \
-  }
-
-#define Z_ZSTREAMER_FILTER_INIT_WRAPPER_DEFINE(inst, _driver_init)             \
-  static int zstreamer_filter_init_##inst(const struct device *dev) {          \
-    int (*init_fn)(const struct device *) = _driver_init;                      \
-    if (init_fn != NULL) {                                                     \
-      int ret = init_fn(dev);                                                  \
-      if (ret != 0) {                                                          \
-        return ret;                                                            \
-      }                                                                        \
-    }                                                                          \
-    return zstreamer_filter_common_init(dev);                                  \
+      .common = {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_filter, inst)},     \
   }
 
 /**
  * @brief Pre-define the thread stack, children, and false-children arrays
  *        for a filter node.
  *
- * Call this BEFORE defining the driver's data/config structs so the
- * stack, children, and false-children symbols are visible to their
- * initialisers.
+ * Emits the static symbols required by ZSTREAMER_FILTER_CONFIG_INIT
+ * and ZSTREAMER_FILTER_DATA_INIT:
+ *   - zstreamer_filter_children_<inst>        (device-pointer array)
+ *   - zstreamer_filter_false_children_<inst>  (device-pointer array)
+ *   - zstreamer_filter_stack_<inst>           (thread stack)
+ *
+ * Must be called BEFORE defining the driver's data/config structs so
+ * that these symbols are visible to their initialisers.
+ *
+ * @param inst     Devicetree instance number.
+ * @param node_id  Devicetree node identifier.
  */
 #define ZSTREAMER_FILTER_DT_PRE_DEFINE(inst, node_id)                          \
   Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_filter, inst, node_id);                \
@@ -94,33 +106,34 @@ extern int zstreamer_filter_common_init(const struct device *dev);
   static K_THREAD_STACK_DEFINE(zstreamer_filter_stack_##inst,                  \
                                DT_PROP(node_id, thread_stack_size))
 
+/**
+ * @brief Convenience wrapper for ZSTREAMER_FILTER_DT_PRE_DEFINE using
+ *        DT_DRV_INST.
+ *
+ * @param inst  Devicetree instance number.
+ */
 #define ZSTREAMER_FILTER_DT_INST_PRE_DEFINE(inst)                              \
   ZSTREAMER_FILTER_DT_PRE_DEFINE(inst, DT_DRV_INST(inst))
 
 /**
- * @brief Define a zstreamer filter node device from a DT node identifier.
- *
- * The thread stack, children, and false-children arrays must already
- * have been emitted with ZSTREAMER_FILTER_DT_PRE_DEFINE /
- * ZSTREAMER_FILTER_DT_INST_PRE_DEFINE.
- */
-#define ZSTREAMER_FILTER_DT_DEFINE(inst, node_id, init_fn, data_ptr, cfg_ptr,  \
-                                    api_ptr)                                    \
-  Z_ZSTREAMER_FILTER_INIT_WRAPPER_DEFINE(inst, init_fn)                        \
-  DEVICE_DT_DEFINE(node_id, zstreamer_filter_init_##inst, NULL, data_ptr,      \
-                   cfg_ptr, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,   \
-                   api_ptr)
-
-#define ZSTREAMER_FILTER_DT_INST_DEFINE(inst, init_fn, data_ptr, cfg_ptr,      \
-                                         api_ptr)                               \
-  ZSTREAMER_FILTER_DT_DEFINE(inst, DT_DRV_INST(inst), init_fn, data_ptr,       \
-                             cfg_ptr, api_ptr)
-
-/** @endcond */
-
-/**
  * @}
  */
+
+/** @cond INTERNAL_HIDDEN */
+
+#define Z_ZSTREAMER_FALSE_CHILDREN_DEFINE(prefix, inst, node_id)               \
+  static const struct device *const prefix##_false_children_##inst[] = {       \
+      COND_CODE_1(                                                             \
+          DT_NODE_HAS_PROP(node_id, false_children),                           \
+          (DT_FOREACH_PROP_ELEM_SEP(node_id, false_children,                   \
+                                    Z_ZSTREAMER_NODE_CHILD_DEV_GET, (, ))),    \
+          ())}
+
+#define Z_ZSTREAMER_NUM_FALSE_CHILDREN(node_id)                                \
+  COND_CODE_1(DT_NODE_HAS_PROP(node_id, false_children),                       \
+              (DT_PROP_LEN(node_id, false_children)), (0))
+
+/** @endcond */
 
 #ifdef __cplusplus
 }

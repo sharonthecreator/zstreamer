@@ -12,8 +12,8 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net_buf.h>
 
+#include <zstreamer/fs/fs_sink.h>
 #include <zstreamer/sink.h>
-#include <zstreamer/fs_sink.h>
 
 LOG_MODULE_REGISTER(fs_sink, CONFIG_ZSTREAMER_LOG_LEVEL);
 
@@ -114,18 +114,6 @@ static bool should_rotate(const struct device *dev, size_t incoming_len) {
   return false;
 }
 
-static int fs_sink_open(const struct device *dev) {
-  struct fs_sink_data *data = dev->data;
-
-  data->file_index = 0;
-
-  if (data->filename_cb == NULL) {
-    data->filename_cb = default_filename_cb;
-  }
-
-  return open_new_file(dev);
-}
-
 static int fs_sink_process(const struct device *dev, struct net_buf *buf) {
   struct fs_sink_data *data = dev->data;
   int ret;
@@ -149,16 +137,26 @@ static int fs_sink_process(const struct device *dev, struct net_buf *buf) {
   return 0;
 }
 
-static int fs_sink_close(const struct device *dev) {
+static int fs_sink_init(const struct device *dev) {
   struct fs_sink_data *data = dev->data;
 
-  return fs_close(&data->current_file);
+  data->file_index = 0;
+
+  if (data->filename_cb == NULL) {
+    data->filename_cb = default_filename_cb;
+  }
+
+  int ret = open_new_file(dev);
+
+  if (ret != 0) {
+    return ret;
+  }
+
+  return zstreamer_node_common_init(dev);
 }
 
-static const struct zstreamer_sink_driver_api fs_sink_api = {
-    .open = fs_sink_open,
+static const struct zstreamer_node_driver_api fs_sink_api = {
     .process = fs_sink_process,
-    .close = fs_sink_close,
 };
 
 int fs_sink_set_filename_handler(const struct device *dev,
@@ -178,18 +176,21 @@ int fs_sink_set_filename_handler(const struct device *dev,
                "non-zero");                                                    \
   ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst);                                     \
   static struct fs_sink_data fs_sink_data_##inst = {                           \
-      .common = Z_ZSTREAMER_SINK_DATA_INIT(                                    \
-          inst, zstreamer_sink_stack_##inst),                                  \
+      .common = ZSTREAMER_SINK_DATA_INIT(inst),                                \
+      .file_open_time = 0,                                                     \
+      .current_file_size = 0,                                                  \
+      .file_index = 0,                                                         \
+      .filename_cb = NULL,                                                     \
+      .filename_cb_user_data = NULL,                                           \
   };                                                                           \
   static const struct fs_sink_config fs_sink_config_##inst = {                 \
-      .common = {Z_ZSTREAMER_SINK_CONFIG_INIT(                                 \
-          DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
-          DT_INST_PROP(inst, thread_priority))},                               \
+      .common = ZSTREAMER_SINK_CONFIG_INIT(inst),                              \
       .mount_path = DT_INST_PROP(inst, mount_path),                            \
       .delta_ms_threshold = DT_INST_PROP(inst, delta_ms_threshold),            \
       .size_threshold = DT_INST_PROP(inst, size_threshold),                    \
   };                                                                           \
-  ZSTREAMER_SINK_DT_INST_DEFINE(inst, NULL, &fs_sink_data_##inst,              \
-                                &fs_sink_config_##inst, &fs_sink_api);
+  DEVICE_DT_INST_DEFINE(inst, fs_sink_init, NULL, &fs_sink_data_##inst,        \
+                        &fs_sink_config_##inst, POST_KERNEL,                   \
+                        CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &fs_sink_api);
 
 DT_INST_FOREACH_STATUS_OKAY(FS_SINK_DEFINE)

@@ -13,10 +13,6 @@
 
 LOG_MODULE_REGISTER(numgen_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 
-struct numgen_src_config {
-  struct zstreamer_source_config common;
-};
-
 struct numgen_src_data {
   struct zstreamer_source_data common;
   uint8_t counter;
@@ -35,22 +31,19 @@ static int numgen_src_process(const struct device *dev, struct net_buf *buf) {
   return 0;
 }
 
-static const struct zstreamer_source_driver_api numgen_src_api = {
-    .generate = numgen_src_process,
+static const struct zstreamer_node_driver_api numgen_src_api = {
+    .process = numgen_src_process,
 };
 
 #define NUMGEN_SRC_DEFINE(inst)                                                \
   ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst);                                   \
   static struct numgen_src_data numgen_src_data_##inst = {                     \
-      .common = Z_ZSTREAMER_SOURCE_DATA_INIT(                                  \
-          inst, zstreamer_source_stack_##inst),                                \
-  };                                                                           \
-  static const struct numgen_src_config numgen_src_config_##inst = {           \
-      .common = {Z_ZSTREAMER_SOURCE_CONFIG_INIT(                               \
-          inst, DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),      \
-          DT_INST_PROP(inst, thread_priority))},                               \
-  };                                                                           \
-  ZSTREAMER_SOURCE_DT_INST_DEFINE(inst, NULL, &numgen_src_data_##inst,         \
-                                  &numgen_src_config_##inst, &numgen_src_api);
+      .common = ZSTREAMER_SOURCE_DATA_INIT(inst), .counter = 0};               \
+  static const struct zstreamer_source_config numgen_src_config_##inst =       \
+      ZSTREAMER_SOURCE_CONFIG_INIT(inst);                                      \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,                \
+                        &numgen_src_data_##inst, &numgen_src_config_##inst,    \
+                        POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
+                        &numgen_src_api);
 
 DT_INST_FOREACH_STATUS_OKAY(NUMGEN_SRC_DEFINE)

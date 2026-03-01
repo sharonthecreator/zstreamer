@@ -15,10 +15,6 @@
 
 LOG_MODULE_REGISTER(count_sink, CONFIG_ZSTREAMER_LOG_LEVEL);
 
-struct count_sink_config {
-  struct zstreamer_sink_config common;
-};
-
 struct count_sink_data {
   struct zstreamer_sink_data common;
   atomic_t buf_count;
@@ -53,22 +49,22 @@ void count_sink_reset(const struct device *dev) {
   atomic_set(&data->byte_count, 0);
 }
 
-static const struct zstreamer_sink_driver_api count_sink_api = {
+static const struct zstreamer_node_driver_api count_sink_api = {
     .process = count_sink_process,
 };
 
 #define COUNT_SINK_DEFINE(inst)                                                \
   ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst);                                     \
   static struct count_sink_data count_sink_data_##inst = {                     \
-      .common = Z_ZSTREAMER_SINK_DATA_INIT(                                    \
-          inst, zstreamer_sink_stack_##inst),                                  \
+      .common = ZSTREAMER_SINK_DATA_INIT(inst),                                \
+      .buf_count = ATOMIC_INIT(0),                                             \
+      .byte_count = ATOMIC_INIT(0),                                            \
   };                                                                           \
-  static const struct count_sink_config count_sink_config_##inst = {           \
-      .common = {Z_ZSTREAMER_SINK_CONFIG_INIT(                                 \
-          DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
-          DT_INST_PROP(inst, thread_priority))},                               \
-  };                                                                           \
-  ZSTREAMER_SINK_DT_INST_DEFINE(inst, NULL, &count_sink_data_##inst,           \
-                                &count_sink_config_##inst, &count_sink_api);
+  static const struct zstreamer_sink_config count_sink_config_##inst =         \
+      ZSTREAMER_SINK_CONFIG_INIT(inst);                                        \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,                \
+                        &count_sink_data_##inst, &count_sink_config_##inst,    \
+                        POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
+                        &count_sink_api);
 
 DT_INST_FOREACH_STATUS_OKAY(COUNT_SINK_DEFINE)

@@ -14,24 +14,27 @@ All streaming nodes are children of a graph in the devicetree.
 ### Node types
 
 zstreamer provides four compile-time node types, each with its own header, subsystem
-implementation, driver API struct, and DTS binding. All share a common base (`node.h`).
+implementation, and DTS binding. All share a single unified driver API struct
+(`struct zstreamer_node_driver_api` in `node.h`).
 
 | Type | Header | Callback | Has children | Start/Stop |
 |------|--------|----------|-------------|------------|
-| **Source** | `source.h` | `generate(dev, buf)` | Yes | `zstreamer_source_start/stop()` |
+| **Source** | `source.h` | `process(dev, buf)` | Yes | `zstreamer_source_start/stop()` |
 | **Sink** | `sink.h` | `process(dev, buf)` | No (enforced at compile time) | N/A (always running) |
-| **Processor** | `processor.h` | `process(dev, buf)` | Yes | N/A (always running) |
-| **Filter** | `filter.h` | `filter(dev, buf)` → `bool` | Yes + `false_children` | N/A (always running) |
+| **Processor** | `node.h` | `process(dev, buf)` | Yes | N/A (always running) |
+| **Filter** | `filter.h` | `process(dev, buf)` → `int` (0/1) | Yes + `false_children` | N/A (always running) |
 
-- **Source**: Allocates buffers, fills them via `generate`, and fans out to children.
+- **Source**: Allocates buffers, fills them via `process`, and fans out to children.
   Only sources can be started/stopped at runtime.
 - **Sink**: Terminal node. Consumes buffers from its FIFO and unrefs them. The sink
-  config struct has no `children` field — attempting to add children is a compile error.
+  DTS binding has no `children` property — attempting to add children is a build error.
 - **Processor**: Receives buffers, processes them in-place, and forwards to children.
-- **Filter**: Receives buffers, runs a boolean `filter` callback. If true, distributes
-  to `children`; if false, distributes to `false_children`.
+  Uses the base `node.h` types directly.
+- **Filter**: Receives buffers, runs `process` callback. If it returns 1 (true),
+  distributes to `children`; if 0 (false), distributes to `false_children`;
+  if negative, logs the error and drops the buffer.
 
-All non-source nodes call `open()` during init and run their thread immediately at boot.
+All non-source nodes run their thread immediately at boot. Driver setup belongs in the Zephyr init function.
 
 ### Lifecycle contract (source nodes)
 
@@ -62,39 +65,21 @@ int zstreamer_source_start(const struct device *dev);
 int zstreamer_source_stop(const struct device *dev);
 ```
 
-### Driver API structs
+### Driver API struct
 
-Each node type defines its own `__subsystem` driver API:
+All node types share a single unified driver API:
 
 ```c
-/* Source */
-__subsystem struct zstreamer_source_driver_api {
-    int (*open)(const struct device *dev);
-    int (*close)(const struct device *dev);
-    int (*generate)(const struct device *dev, struct net_buf *buf);
-};
-
-/* Sink */
-__subsystem struct zstreamer_sink_driver_api {
-    int (*open)(const struct device *dev);
-    int (*close)(const struct device *dev);
+__subsystem struct zstreamer_node_driver_api {
     int (*process)(const struct device *dev, struct net_buf *buf);
-};
-
-/* Processor */
-__subsystem struct zstreamer_processor_driver_api {
-    int (*open)(const struct device *dev);
-    int (*close)(const struct device *dev);
-    int (*process)(const struct device *dev, struct net_buf *buf);
-};
-
-/* Filter */
-__subsystem struct zstreamer_filter_driver_api {
-    int (*open)(const struct device *dev);
-    int (*close)(const struct device *dev);
-    bool (*filter)(const struct device *dev, struct net_buf *buf);
 };
 ```
+
+Driver setup belongs in the Zephyr init function, not in the API struct.
+
+For filters, the `process` callback uses the return value convention:
+`1` = true (route to children), `0` = false (route to false_children),
+`<0` = error (buffer is dropped).
 
 ## Devicetree conventions
 
@@ -153,56 +138,226 @@ zstreamer,node.yaml           (base: thread-stack-size, thread-priority)
 
 ## Writing a new driver
 
+Every zstreamer driver follows the same pattern:
+
+1. Set `DT_DRV_COMPAT` and include the type-specific header.
+2. Call the type's `PRE_DEFINE` macro to emit stack/children symbols.
+3. Define config/data structs using the type's `CONFIG_INIT` / `DATA_INIT` macros.
+4. Implement a `struct zstreamer_node_driver_api` with `.process`.
+5. Register with `DEVICE_DT_INST_DEFINE(...)`, passing `zstreamer_node_common_init`
+   directly (or a custom init function that calls it at the end).
+   Drivers that need hardware setup should use a custom init function.
+
+If the driver adds no extra config or data fields, use the base type structs
+directly (e.g. `struct zstreamer_sink_config`). If it does, embed the base
+type as `.common` and initialize it with the corresponding `CONFIG_INIT` /
+`DATA_INIT` macro.
+
 ### Source driver
 
-1. Add a binding under `dts/bindings/zstreamer/` that includes `zstreamer,src.yaml`.
-2. Define config/data structs with the type-specific common struct as first member:
-   ```c
-   struct my_src_config {
-       struct zstreamer_source_config common;
-       /* driver-specific fields */
-   };
-   struct my_src_data {
-       struct zstreamer_source_data common;
-       /* driver-specific fields */
-   };
-   ```
-3. Implement `generate(dev, buf)` (and optionally `open`/`close`).
-4. Instantiate with `ZSTREAMER_SOURCE_DT_INST_DEFINE(...)`.
+Binding: includes `zstreamer,src.yaml`.
+
+Minimal example (no extra fields):
+
+```c
+#define DT_DRV_COMPAT zstreamer_my_src
+
+#include <zstreamer/source.h>
+
+static int my_src_process(const struct device *dev, struct net_buf *buf) {
+    /* Fill buf with data. */
+    return 0;
+}
+
+static const struct zstreamer_node_driver_api my_src_api = {
+    .process = my_src_process,
+};
+
+#define MY_SRC_DEFINE(inst)                                           \
+  ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst);                          \
+  static struct zstreamer_source_data my_src_data_##inst =            \
+      ZSTREAMER_SOURCE_DATA_INIT(inst);                             \
+  static const struct zstreamer_source_config my_src_config_##inst =  \
+      ZSTREAMER_SOURCE_CONFIG_INIT(inst);                           \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,     \
+                        &my_src_data_##inst, &my_src_config_##inst,   \
+                        POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, \
+                        &my_src_api);
+
+DT_INST_FOREACH_STATUS_OKAY(MY_SRC_DEFINE)
+```
+
+With extra data fields:
+
+```c
+struct my_src_data {
+    struct zstreamer_source_data common;
+    uint8_t counter;
+};
+
+#define MY_SRC_DEFINE(inst)                                           \
+  ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst);                          \
+  static struct my_src_data my_src_data_##inst = {                    \
+      .common = ZSTREAMER_SOURCE_DATA_INIT(inst),                   \
+      .counter = 0,                                                   \
+  };                                                                  \
+  static const struct zstreamer_source_config my_src_config_##inst =  \
+      ZSTREAMER_SOURCE_CONFIG_INIT(inst);                           \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,     \
+                        &my_src_data_##inst, &my_src_config_##inst,   \
+                        POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, \
+                        &my_src_api);
+```
 
 ### Sink driver
 
-1. Binding includes `zstreamer,sink.yaml`.
-2. Config/data use `zstreamer_sink_config` / `zstreamer_sink_data`.
-3. Implement `process(dev, buf)`.
-4. Instantiate with `ZSTREAMER_SINK_DT_INST_DEFINE(...)`.
+Binding: includes `zstreamer,sink.yaml`.
 
-### Processor driver
+Minimal example:
 
-1. Binding includes `zstreamer,processor.yaml`.
-2. Config/data use `zstreamer_processor_config` / `zstreamer_processor_data`.
-3. Implement `process(dev, buf)` — data is forwarded to children after processing.
-4. Instantiate with `ZSTREAMER_PROCESSOR_DT_INST_DEFINE(...)`.
+```c
+#define DT_DRV_COMPAT zstreamer_my_sink
+
+#include <zstreamer/sink.h>
+
+static int my_sink_process(const struct device *dev, struct net_buf *buf) {
+    /* Consume buf. */
+    return 0;
+}
+
+static const struct zstreamer_node_driver_api my_sink_api = {
+    .process = my_sink_process,
+};
+
+#define MY_SINK_DEFINE(inst)                                            \
+  ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst);                              \
+  static struct zstreamer_sink_data my_sink_data_##inst =               \
+      ZSTREAMER_SINK_DATA_INIT(inst);                                 \
+  static const struct zstreamer_sink_config my_sink_config_##inst =     \
+      ZSTREAMER_SINK_CONFIG_INIT(inst);                               \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,         \
+                        &my_sink_data_##inst, &my_sink_config_##inst,   \
+                        POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, \
+                        &my_sink_api);
+
+DT_INST_FOREACH_STATUS_OKAY(MY_SINK_DEFINE)
+```
+
+With custom init logic (e.g. hardware setup):
+
+```c
+static int my_sink_init(const struct device *dev) {
+    /* Driver-specific init (e.g. configure a peripheral). */
+    /* ... */
+
+    /* Always call common_init last — it starts the node thread. */
+    return zstreamer_node_common_init(dev);
+}
+
+/* In the DEFINE macro, pass my_sink_init instead of
+   zstreamer_node_common_init:                                        */
+  DEVICE_DT_INST_DEFINE(inst, my_sink_init, NULL, ...);
+```
+
+### Processor (through-node) driver
+
+Binding: includes `zstreamer,processor.yaml`.
+
+Processors receive buffers, optionally transform them in-place, and forward
+to children automatically. Use `node.h` types and macros.
+
+```c
+#define DT_DRV_COMPAT zstreamer_my_processor
+
+#include <zstreamer/node.h>
+
+static int my_processor_process(const struct device *dev,
+                                struct net_buf *buf) {
+    /* Transform buf in-place. Return 0 to forward, <0 to drop. */
+    return 0;
+}
+
+static const struct zstreamer_node_driver_api my_processor_api = {
+    .process = my_processor_process,
+};
+
+#define MY_PROCESSOR_DEFINE(inst)                                        \
+  ZSTREAMER_NODE_DT_INST_PRE_DEFINE(inst);                               \
+  static struct zstreamer_node_data my_processor_data_##inst =           \
+      ZSTREAMER_NODE_DATA_INIT(inst);                                  \
+  static const struct zstreamer_node_config my_processor_config_##inst = \
+      ZSTREAMER_NODE_CONFIG_INIT(inst);                                \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,      \
+                        &my_processor_data_##inst,                       \
+                        &my_processor_config_##inst, POST_KERNEL,        \
+                        CONFIG_KERNEL_INIT_PRIORITY_DEVICE,              \
+                        &my_processor_api);
+
+DT_INST_FOREACH_STATUS_OKAY(MY_PROCESSOR_DEFINE)
+```
 
 ### Filter driver
 
-1. Binding includes `zstreamer,filter.yaml`.
-2. Config/data use `zstreamer_filter_config` / `zstreamer_filter_data`.
-3. Implement `filter(dev, buf)` returning `true` (→ children) or `false` (→ false_children).
-4. Instantiate with `ZSTREAMER_FILTER_DT_INST_DEFINE(...)`.
+Binding: includes `zstreamer,filter.yaml`.
+
+The `process` callback returns an `int` with the convention:
+`1` = true (forward to `children`), `0` = false (forward to
+`false_children`), `<0` = error (buffer is dropped).
+
+```c
+#define DT_DRV_COMPAT zstreamer_my_filter
+
+#include <zstreamer/filter.h>
+
+static int my_filter_process(const struct device *dev, struct net_buf *buf) {
+    /* Return 1 to route to children, 0 for false_children, <0 for error. */
+    return (buf->data[0] > 127) ? 1 : 0;
+}
+
+static const struct zstreamer_node_driver_api my_filter_api = {
+    .process = my_filter_process,
+};
+
+#define MY_FILTER_DEFINE(inst)                                            \
+  ZSTREAMER_FILTER_DT_INST_PRE_DEFINE(inst);                              \
+  static struct zstreamer_filter_data my_filter_data_##inst =             \
+      ZSTREAMER_FILTER_DATA_INIT(inst);                                 \
+  static const struct zstreamer_filter_config my_filter_config_##inst =   \
+      ZSTREAMER_FILTER_CONFIG_INIT(inst);                               \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,         \
+                        &my_filter_data_##inst, &my_filter_config_##inst, \
+                        POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,  \
+                        &my_filter_api);
+
+DT_INST_FOREACH_STATUS_OKAY(MY_FILTER_DEFINE)
+```
+
+### Macro quick-reference
+
+| Macro | Purpose |
+|-------|---------|
+| `ZSTREAMER_<TYPE>_DT_INST_PRE_DEFINE(inst)` | Emit stack/children symbols (call first) |
+| `ZSTREAMER_<TYPE>_CONFIG_INIT(inst)` | Braced initializer for the type's config struct |
+| `ZSTREAMER_<TYPE>_DATA_INIT(inst)` | Braced initializer for the type's data struct |
+| `zstreamer_node_common_init` | Init function to pass to `DEVICE_DT_INST_DEFINE` (all types) |
+
+Where `<TYPE>` is `NODE`, `SOURCE`, `SINK`, or `FILTER` (upper-case for macros).
 
 ## Included drivers
 
 | Driver | Type | Location |
 |--------|------|----------|
-| UART source | Source | `drivers/zstreamer/uart/src_uart.c` |
-| UART sink | Sink | `drivers/zstreamer/uart/sink_uart.c` |
-| SPI source | Source | `drivers/zstreamer/spi/src_spi.c` |
-| SPI sink | Sink | `drivers/zstreamer/spi/sink_spi.c` |
-| ADC source | Source | `drivers/zstreamer/adc/src_adc.c` |
-| FS sink | Sink | `drivers/zstreamer/fs/sink_fs.c` |
-| Numgen source (test) | Source | `drivers/zstreamer/test/src_numgen.c` |
-| Fake sink (test) | Sink | `drivers/zstreamer/test/sink_fake.c` |
+| UART source | Source | `drivers/zstreamer/uart/uart_src.c` |
+| UART sink | Sink | `drivers/zstreamer/uart/uart_sink.c` |
+| SPI source | Source | `drivers/zstreamer/spi/spi_src.c` |
+| SPI sink | Sink | `drivers/zstreamer/spi/spi_sink.c` |
+| ADC source | Source | `drivers/zstreamer/adc/adc_src.c` |
+| FS sink | Sink | `drivers/zstreamer/fs/fs_sink.c` |
+| Numgen source (test) | Source | `drivers/zstreamer/test/numgen_src.c` |
+| Fake sink (test) | Sink | `drivers/zstreamer/test/fake_sink.c` |
+| Count sink (test) | Sink | `drivers/zstreamer/test/count_sink.c` |
+| Passthrough (test) | Processor | `drivers/zstreamer/test/passthrough_node.c` |
+| Odd filter (test) | Filter | `drivers/zstreamer/test/odd_filter.c` |
 
 ## Samples
 
@@ -217,7 +372,7 @@ zstreamer,node.yaml           (base: thread-stack-size, thread-priority)
 
 | Suite | Location | Notes |
 |-------|----------|-------|
-| Node/UART | `tests/drivers/node` | Has known hang in `test_numgen_fakesink_restart_cycle` |
+| Node/UART | `tests/drivers/node` | Passing on native_sim/native/64 |
 | Node/SPI | `tests/drivers/node_spi` | Passing on native_sim/native/64 |
 
 On macOS, use Docker (`zephyrprojectrtos/zephyr-build`) for `native_sim/native/64` builds.

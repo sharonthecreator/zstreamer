@@ -139,6 +139,12 @@ static int adc_src_init(const struct device *dev) {
     LOG_ERR("Failed to initialize STM32 ADC: %d", ret);
     return ret;
   }
+
+  ret = adc_src_stm32_start(&data->stm32);
+  if (ret != 0) {
+    LOG_ERR("Failed to start STM32 ADC DMA: %d", ret);
+    return ret;
+  }
 #else
   LOG_ERR("No platform-specific ADC implementation available");
   return -ENOTSUP;
@@ -147,47 +153,7 @@ static int adc_src_init(const struct device *dev) {
   LOG_INF("ADC source %s initialized: %u Hz, %u-bit, %u ch", dev->name,
           cfg->sample_rate_hz, cfg->resolution, cfg->num_channels);
 
-  return 0;
-}
-
-/**
- * Open ADC capture hardware.
- */
-static int adc_src_open(const struct device *dev) {
-  struct adc_src_data *data = dev->data;
-  int ret;
-
-#if defined(CONFIG_ZSTREAMER_ADC_STM32)
-  ret = adc_src_stm32_start(&data->stm32);
-#else
-  ret = -ENOTSUP;
-#endif
-
-  if (ret == 0) {
-    LOG_DBG("ADC source opened");
-  }
-
-  return ret;
-}
-
-/**
- * Close ADC capture hardware.
- */
-static int adc_src_close(const struct device *dev) {
-  struct adc_src_data *data = dev->data;
-  int ret;
-
-#if defined(CONFIG_ZSTREAMER_ADC_STM32)
-  ret = adc_src_stm32_stop(&data->stm32);
-#else
-  ret = -ENOTSUP;
-#endif
-
-  if (ret == 0) {
-    LOG_DBG("ADC source closed");
-  }
-
-  return ret;
+  return zstreamer_node_common_init(dev);
 }
 
 /**
@@ -235,10 +201,8 @@ static int adc_src_process(const struct device *dev, struct net_buf *buf) {
  * ============================================================================
  */
 
-static const struct zstreamer_source_driver_api adc_src_api = {
-    .open = adc_src_open,
-    .close = adc_src_close,
-    .generate = adc_src_process,
+static const struct zstreamer_node_driver_api adc_src_api = {
+    .process = adc_src_process,
 };
 
 /*
@@ -260,13 +224,13 @@ static const struct zstreamer_source_driver_api adc_src_api = {
 #define ADC_SRC_DEFINE(inst)                                                   \
   ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst);                                   \
   static struct adc_src_data adc_src_data_##inst = {                           \
-      .common = Z_ZSTREAMER_SOURCE_DATA_INIT(                                  \
-          inst, zstreamer_source_stack_##inst),                                \
+      .common = ZSTREAMER_SOURCE_DATA_INIT(inst),                              \
+      .ready_buffer = NULL,                                                    \
+      .ready_samples = 0,                                                      \
+      .ready_channels = 0,                                                     \
   };                                                                           \
   static const struct adc_src_config adc_src_config_##inst = {                 \
-      .common = {Z_ZSTREAMER_SOURCE_CONFIG_INIT(                               \
-          inst, DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),      \
-          DT_INST_PROP(inst, thread_priority))},                               \
+      .common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),                            \
       .adc_dev = ADC_DEV_GET(DT_DRV_INST(inst)),                               \
       .adc_channels =                                                          \
           {                                                                    \
@@ -282,8 +246,8 @@ static const struct zstreamer_source_driver_api adc_src_api = {
       .buffer_samples = DT_INST_PROP(inst, buffer_samples),                    \
       .dma_buffer_samples = DT_INST_PROP(inst, dma_buffer_samples),            \
   };                                                                           \
-  ZSTREAMER_SOURCE_DT_INST_DEFINE(inst, adc_src_init,                          \
-                                  &adc_src_data_##inst,                        \
-                                  &adc_src_config_##inst, &adc_src_api);
+  DEVICE_DT_INST_DEFINE(inst, adc_src_init, NULL, &adc_src_data_##inst,        \
+                        &adc_src_config_##inst, POST_KERNEL,                   \
+                        CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &adc_src_api);
 
 DT_INST_FOREACH_STATUS_OKAY(ADC_SRC_DEFINE)

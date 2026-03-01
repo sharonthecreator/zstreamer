@@ -30,7 +30,7 @@ void zstreamer_node_distribute(const struct device *dev, struct net_buf *buf,
     return;
   }
 
-  /* Single stream optimisation. */
+  /* Single stream optimization. */
   if (buf->ref == 1 && num_children == 1) {
     child_data = (struct zstreamer_node_data *)children[0]->data;
     k_fifo_put(&child_data->fifo, buf);
@@ -40,8 +40,7 @@ void zstreamer_node_distribute(const struct device *dev, struct net_buf *buf,
   bool shareable_buffer = !cfg->readonly;
   if (!cfg->readonly) {
     for (size_t i = 0; i < num_children; i++) {
-      child_cfg =
-          (const struct zstreamer_node_config *)children[i]->config;
+      child_cfg = (const struct zstreamer_node_config *)children[i]->config;
 
       if (child_cfg->readonly) {
         shareable_buffer = false;
@@ -81,29 +80,10 @@ void zstreamer_node_drain_fifo(struct k_fifo *fifo) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Base init                                                           */
+/* Standard node thread entry                                         */
 /* ------------------------------------------------------------------ */
 
-int zstreamer_node_base_init(const struct device *dev,
-                              k_thread_entry_t entry) {
-  struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
-  const struct zstreamer_node_config *cfg =
-      (const struct zstreamer_node_config *)dev->config;
-
-  data->dev = dev;
-  k_fifo_init(&data->fifo);
-
-  k_thread_create(&data->thread, data->stack, cfg->thread_stack_size, entry,
-                  (void *)dev, NULL, NULL, cfg->thread_priority, 0, K_NO_WAIT);
-
-  return 0;
-}
-
-/* ------------------------------------------------------------------ */
-/* Through-node thread entry                                           */
-/* ------------------------------------------------------------------ */
-
-static void node_thread_entry(void *p1, void *p2, void *p3) {
+void zstreamer_node_thread_entry(void *p1, void *p2, void *p3) {
   const struct device *dev = (const struct device *)p1;
   struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
   const struct zstreamer_node_config *cfg =
@@ -134,23 +114,22 @@ static void node_thread_entry(void *p1, void *p2, void *p3) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Through-node common init                                            */
+/* Common init                                                         */
 /* ------------------------------------------------------------------ */
 
 int zstreamer_node_common_init(const struct device *dev) {
-  const struct zstreamer_node_driver_api *api =
-      (const struct zstreamer_node_driver_api *)dev->api;
+  struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
+  const struct zstreamer_node_config *cfg =
+      (const struct zstreamer_node_config *)dev->config;
 
-  if (api->open != NULL) {
-    int ret = api->open(dev);
+  data->dev = dev;
+  k_fifo_init(&data->fifo);
 
-    if (ret != 0) {
-      LOG_ERR("[%s] open failed: %d", dev->name, ret);
-      return ret;
-    }
-  }
+  k_thread_create(&data->thread, data->stack, cfg->thread_stack_size,
+                  cfg->thread_entry, (void *)dev, NULL, NULL,
+                  cfg->thread_priority, 0, K_NO_WAIT);
 
-  return zstreamer_node_base_init(dev, node_thread_entry);
+  return 0;
 }
 
 /* ------------------------------------------------------------------ */

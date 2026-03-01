@@ -56,17 +56,6 @@ static int uart_sink_open_dma(const struct device *dev) {
   return 0;
 }
 
-static int uart_sink_close_dma(const struct device *dev) {
-  const struct uart_sink_config *cfg = dev->config;
-  struct uart_sink_data *data = dev->data;
-
-  if (data->dma_enabled) {
-    uart_dma_context_unregister_tx(cfg->uart_dev);
-    data->dma_enabled = false;
-  }
-  return 0;
-}
-
 static int uart_sink_process_dma(const struct device *dev,
                                  struct net_buf *buf) {
   const struct uart_sink_config *cfg = dev->config;
@@ -113,58 +102,38 @@ static int uart_sink_process(const struct device *dev, struct net_buf *buf) {
   return uart_sink_process_poll(dev, buf);
 }
 
+static const struct zstreamer_node_driver_api uart_sink_api = {
+    .process = uart_sink_process,
+};
+
+static int uart_sink_init(const struct device *dev) {
 #if defined(CONFIG_UART_ASYNC_API)
-static int uart_sink_open(const struct device *dev) {
   const struct uart_sink_config *cfg = dev->config;
+  struct uart_sink_data *data = dev->data;
   int ret;
+
+  k_sem_init(&data->tx_sem, 0, 1);
 
   /* Try to enable DMA, fall back to polling if it fails. */
   ret = uart_sink_open_dma(dev);
   if (ret != 0) {
     LOG_INF("DMA not available for %s, using polling", cfg->uart_dev->name);
   }
-  return 0;
-}
-
-static int uart_sink_close(const struct device *dev) {
-  return uart_sink_close_dma(dev);
-}
 #endif
-
-static const struct zstreamer_sink_driver_api uart_sink_api = {
-#if defined(CONFIG_UART_ASYNC_API)
-    .open = uart_sink_open,
-    .close = uart_sink_close,
-#endif
-    .process = uart_sink_process,
-};
-
-#if defined(CONFIG_UART_ASYNC_API)
-static int uart_sink_init(const struct device *dev) {
-  struct uart_sink_data *data = dev->data;
-
-  k_sem_init(&data->tx_sem, 0, 1);
-  return 0;
+  return zstreamer_node_common_init(dev);
 }
-#define UART_SINK_INIT_FN uart_sink_init
-#else
-#define UART_SINK_INIT_FN NULL
-#endif
 
 #define UART_SINK_DEFINE(inst)                                                 \
   ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst);                                     \
   static struct uart_sink_data uart_sink_data_##inst = {                       \
-      .common = Z_ZSTREAMER_SINK_DATA_INIT(                                    \
-          inst, zstreamer_sink_stack_##inst),                                  \
+      .common = ZSTREAMER_SINK_DATA_INIT(inst),                                \
   };                                                                           \
   static const struct uart_sink_config uart_sink_config_##inst = {             \
-      .common = {Z_ZSTREAMER_SINK_CONFIG_INIT(                                 \
-          DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
-          DT_INST_PROP(inst, thread_priority))},                               \
+      .common = ZSTREAMER_SINK_CONFIG_INIT(inst),                              \
       .uart_dev = DEVICE_DT_GET(DT_INST_PHANDLE(inst, uart_device)),           \
   };                                                                           \
-  ZSTREAMER_SINK_DT_INST_DEFINE(inst, UART_SINK_INIT_FN,                       \
-                                &uart_sink_data_##inst,                        \
-                                &uart_sink_config_##inst, &uart_sink_api);
+  DEVICE_DT_INST_DEFINE(inst, uart_sink_init, NULL, &uart_sink_data_##inst,    \
+                        &uart_sink_config_##inst, POST_KERNEL,                 \
+                        CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &uart_sink_api);
 
 DT_INST_FOREACH_STATUS_OKAY(UART_SINK_DEFINE)

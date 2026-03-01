@@ -10,23 +10,26 @@
 
 #include <zstreamer/source.h>
 
-LOG_MODULE_DECLARE(zstreamer_node, CONFIG_ZSTREAMER_LOG_LEVEL);
+LOG_MODULE_REGISTER(zstreamer_source, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 /* ------------------------------------------------------------------ */
 /* Thread entry                                                        */
 /* ------------------------------------------------------------------ */
 
-static void source_thread_entry(void *p1, void *p2, void *p3) {
+void zstreamer_source_thread_entry(void *p1, void *p2, void *p3) {
   const struct device *dev = (const struct device *)p1;
   struct zstreamer_source_data *data =
       (struct zstreamer_source_data *)dev->data;
   const struct zstreamer_source_config *cfg =
       (const struct zstreamer_source_config *)dev->config;
-  const struct zstreamer_source_driver_api *api =
-      (const struct zstreamer_source_driver_api *)dev->api;
+  const struct zstreamer_node_driver_api *api =
+      (const struct zstreamer_node_driver_api *)dev->api;
 
   ARG_UNUSED(p2);
   ARG_UNUSED(p3);
+
+  k_sem_init(&data->run_sem, 0, 1);
+  k_sem_init(&data->idle_sem, 0, 1);
 
   while (true) {
     k_sem_take(&data->run_sem, K_FOREVER);
@@ -38,7 +41,7 @@ static void source_thread_entry(void *p1, void *p2, void *p3) {
         continue;
       }
 
-      int ret = api->generate(dev, buf);
+      int ret = api->process(dev, buf);
 
       if (ret != 0) {
         net_buf_unref(buf);
@@ -56,40 +59,15 @@ static void source_thread_entry(void *p1, void *p2, void *p3) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Common init                                                         */
-/* ------------------------------------------------------------------ */
-
-int zstreamer_source_common_init(const struct device *dev) {
-  struct zstreamer_source_data *data =
-      (struct zstreamer_source_data *)dev->data;
-
-  k_sem_init(&data->run_sem, 0, 1);
-  k_sem_init(&data->idle_sem, 0, 1);
-
-  return zstreamer_node_base_init(dev, source_thread_entry);
-}
-
-/* ------------------------------------------------------------------ */
 /* Public API                                                          */
 /* ------------------------------------------------------------------ */
 
 int zstreamer_source_start(const struct device *dev) {
   struct zstreamer_source_data *data =
       (struct zstreamer_source_data *)dev->data;
-  const struct zstreamer_source_driver_api *api =
-      (const struct zstreamer_source_driver_api *)dev->api;
 
   if (atomic_set(&data->running, 1) == 1) {
     return -EALREADY;
-  }
-
-  if (api->open != NULL) {
-    int ret = api->open(dev);
-
-    if (ret != 0) {
-      atomic_set(&data->running, 0);
-      return ret;
-    }
   }
 
   k_sem_give(&data->run_sem);
@@ -100,8 +78,6 @@ int zstreamer_source_start(const struct device *dev) {
 int zstreamer_source_stop(const struct device *dev) {
   struct zstreamer_source_data *data =
       (struct zstreamer_source_data *)dev->data;
-  const struct zstreamer_source_driver_api *api =
-      (const struct zstreamer_source_driver_api *)dev->api;
 
   if (atomic_set(&data->running, 0) == 0) {
     return -EALREADY;
@@ -112,10 +88,6 @@ int zstreamer_source_stop(const struct device *dev) {
   }
 
   zstreamer_node_drain_fifo(&data->common.fifo);
-
-  if (api->close != NULL) {
-    api->close(dev);
-  }
 
   return 0;
 }

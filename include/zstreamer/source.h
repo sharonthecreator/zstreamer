@@ -40,30 +40,13 @@ struct zstreamer_source_data {
 };
 
 /**
- * @brief Source node driver API.
- *
- * @param open      Optional. Called by zstreamer_source_start() before
- *                  the generate loop begins.
- * @param close     Optional. Called by zstreamer_source_stop() after
- *                  the generate loop ends.
- * @param generate  Required. Called with a pre-allocated buffer; the
- *                  driver fills it with data. Return 0 on success;
- *                  non-zero causes the buffer to be dropped.
- */
-__subsystem struct zstreamer_source_driver_api {
-  int (*open)(const struct device *dev);
-  int (*close)(const struct device *dev);
-  int (*generate)(const struct device *dev, struct net_buf *buf);
-};
-
-/**
  * @brief Start a source node.
  *
- * Sets the running flag, calls the driver's open callback, and signals
- * the source thread to begin generating.
+ * Sets the running flag and signals the source thread to begin
+ * generating.
  *
  * @param dev Source node device.
- * @return 0 on success, -EALREADY if already running, or negative errno.
+ * @return 0 on success, -EALREADY if already running.
  */
 int zstreamer_source_start(const struct device *dev);
 
@@ -71,71 +54,89 @@ int zstreamer_source_start(const struct device *dev);
  * @brief Stop a source node.
  *
  * Clears the running flag, waits for the source thread to become idle,
- * drains pending buffers, and calls the driver's close callback.
+ * and drains pending buffers.
  *
  * @param dev Source node device.
- * @return 0 on success, -EALREADY if already stopped, or negative errno.
+ * @return 0 on success, -EALREADY if already stopped.
  */
 int zstreamer_source_stop(const struct device *dev);
 
-/** @cond INTERNAL_HIDDEN */
+/**
+ * @brief Thread entry for source nodes.
+ *
+ * Declared here so ZSTREAMER_SOURCE_CONFIG_INIT can reference it.
+ */
+extern void zstreamer_source_thread_entry(void *p1, void *p2, void *p3);
 
-extern int zstreamer_source_common_init(const struct device *dev);
-
-#define Z_ZSTREAMER_SOURCE_CONFIG_INIT(inst, node_id, _stack_size, _prio)      \
-  .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(node_id, _stack_size, _prio,         \
-      zstreamer_source_children_##inst, Z_ZSTREAMER_NUM_CHILDREN(node_id))}
-
-#define Z_ZSTREAMER_SOURCE_DATA_INIT(inst, _stack)                             \
+/**
+ * @brief Source node config initializer.
+ *
+ * Produces a braced initializer value for struct zstreamer_source_config.
+ * Requires ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst) to have been called
+ * earlier so that the children array symbol is visible.
+ *
+ * Usage: .common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),
+ *
+ * @param inst  Devicetree instance number.
+ */
+#define ZSTREAMER_SOURCE_CONFIG_INIT(inst)                                     \
   {                                                                            \
-      .common = Z_ZSTREAMER_NODE_DATA_INIT(_stack),                            \
+    .common = {                                                                \
+      Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(                                       \
+          DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
+          DT_INST_PROP(inst, thread_priority),                                 \
+          zstreamer_source_children_##inst,                                    \
+          Z_ZSTREAMER_NUM_CHILDREN(DT_DRV_INST(inst)),                         \
+          zstreamer_source_thread_entry)                                       \
+    }                                                                          \
   }
 
-#define Z_ZSTREAMER_SOURCE_INIT_WRAPPER_DEFINE(inst, _driver_init)             \
-  static int zstreamer_source_init_##inst(const struct device *dev) {          \
-    int (*init_fn)(const struct device *) = _driver_init;                      \
-    if (init_fn != NULL) {                                                     \
-      int ret = init_fn(dev);                                                  \
-      if (ret != 0) {                                                          \
-        return ret;                                                            \
-      }                                                                        \
-    }                                                                          \
-    return zstreamer_source_common_init(dev);                                  \
+/**
+ * @brief Source node data initializer.
+ *
+ * Produces a braced initializer value for struct zstreamer_source_data.
+ * Requires ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst) to have been called
+ * earlier so that the stack symbol is visible.  Initializes the running
+ * flag to 0 (stopped).  Zephyr runtime fields and semaphores are
+ * initialized later by zstreamer_node_common_init().
+ *
+ * Usage: .common = ZSTREAMER_SOURCE_DATA_INIT(inst),
+ *
+ * @param inst  Devicetree instance number.
+ */
+#define ZSTREAMER_SOURCE_DATA_INIT(inst)                                       \
+  {                                                                            \
+      .common = {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_source, inst)},     \
+      .running = ATOMIC_INIT(0),                                               \
   }
 
 /**
  * @brief Pre-define the thread stack and children array for a source node.
  *
- * Call this BEFORE defining the driver's data/config structs so the
- * stack and children symbols are visible to their initialisers.
+ * Emits the static symbols required by ZSTREAMER_SOURCE_CONFIG_INIT
+ * and ZSTREAMER_SOURCE_DATA_INIT:
+ *   - zstreamer_source_children_<inst>  (device-pointer array)
+ *   - zstreamer_source_stack_<inst>     (thread stack)
+ *
+ * Must be called BEFORE defining the driver's data/config structs so
+ * that these symbols are visible to their initialisers.
+ *
+ * @param inst     Devicetree instance number.
+ * @param node_id  Devicetree node identifier.
  */
 #define ZSTREAMER_SOURCE_DT_PRE_DEFINE(inst, node_id)                          \
   Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_source, inst, node_id);                \
   static K_THREAD_STACK_DEFINE(zstreamer_source_stack_##inst,                  \
                                DT_PROP(node_id, thread_stack_size))
 
+/**
+ * @brief Convenience wrapper for ZSTREAMER_SOURCE_DT_PRE_DEFINE using
+ *        DT_DRV_INST.
+ *
+ * @param inst  Devicetree instance number.
+ */
 #define ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst)                              \
   ZSTREAMER_SOURCE_DT_PRE_DEFINE(inst, DT_DRV_INST(inst))
-
-/**
- * @brief Define a zstreamer source node device from a DT node identifier.
- *
- * The thread stack and children array must already have been emitted
- * with ZSTREAMER_SOURCE_DT_PRE_DEFINE / ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE.
- */
-#define ZSTREAMER_SOURCE_DT_DEFINE(inst, node_id, init_fn, data_ptr, cfg_ptr,  \
-                                    api_ptr)                                    \
-  Z_ZSTREAMER_SOURCE_INIT_WRAPPER_DEFINE(inst, init_fn)                        \
-  DEVICE_DT_DEFINE(node_id, zstreamer_source_init_##inst, NULL, data_ptr,      \
-                   cfg_ptr, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,   \
-                   api_ptr)
-
-#define ZSTREAMER_SOURCE_DT_INST_DEFINE(inst, init_fn, data_ptr, cfg_ptr,      \
-                                         api_ptr)                               \
-  ZSTREAMER_SOURCE_DT_DEFINE(inst, DT_DRV_INST(inst), init_fn, data_ptr,       \
-                             cfg_ptr, api_ptr)
-
-/** @endcond */
 
 /**
  * @}

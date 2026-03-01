@@ -134,59 +134,36 @@ static int spi_sink_process(const struct device *dev, struct net_buf *buf) {
   return spi_sink_process_poll(dev, buf);
 }
 
-static int spi_sink_open(const struct device *dev) {
-#if defined(CONFIG_SPI_ASYNC)
-  spi_sink_open_async(dev);
-#endif
-  return 0;
-}
-
-static int spi_sink_close(const struct device *dev) {
-#if defined(CONFIG_SPI_ASYNC)
-  struct spi_sink_data *data = dev->data;
-
-  data->async_enabled = false;
-#endif
-  return 0;
-}
-
-static const struct zstreamer_sink_driver_api spi_sink_api = {
-    .open = spi_sink_open,
-    .close = spi_sink_close,
+static const struct zstreamer_node_driver_api spi_sink_api = {
     .process = spi_sink_process,
 };
 
-#if defined(CONFIG_SPI_ASYNC)
 static int spi_sink_init(const struct device *dev) {
+#if defined(CONFIG_SPI_ASYNC)
   struct spi_sink_data *data = dev->data;
 
   k_poll_signal_init(&data->sig);
   k_poll_event_init(&data->evt, K_POLL_TYPE_SIGNAL, K_POLL_MODE_NOTIFY_ONLY,
                     &data->sig);
-  return 0;
-}
-#define SPI_SINK_INIT_FN spi_sink_init
-#else
-#define SPI_SINK_INIT_FN NULL
+  spi_sink_open_async(dev);
 #endif
+  return zstreamer_node_common_init(dev);
+}
 
 #define SPI_DEV_NODE(inst) DT_INST_PHANDLE(inst, spi_device)
 
 #define SPI_SINK_DEFINE(inst)                                                  \
   ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst);                                     \
   static struct spi_sink_data spi_sink_data_##inst = {                         \
-      .common = Z_ZSTREAMER_SINK_DATA_INIT(                                    \
-          inst, zstreamer_sink_stack_##inst),                                  \
+      .common = ZSTREAMER_SINK_DATA_INIT(inst),                                \
   };                                                                           \
   static const struct spi_sink_config spi_sink_config_##inst = {               \
-      .common = {Z_ZSTREAMER_SINK_CONFIG_INIT(                                 \
-          DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
-          DT_INST_PROP(inst, thread_priority))},                               \
+      .common = ZSTREAMER_SINK_CONFIG_INIT(inst),                              \
       .spi = SPI_DT_SPEC_GET(SPI_DEV_NODE(inst),                               \
                              SPI_OP_MODE_MASTER | SPI_WORD_SET(8), 0),         \
   };                                                                           \
-  ZSTREAMER_SINK_DT_INST_DEFINE(inst, SPI_SINK_INIT_FN,                        \
-                                &spi_sink_data_##inst,                         \
-                                &spi_sink_config_##inst, &spi_sink_api);
+  DEVICE_DT_INST_DEFINE(inst, spi_sink_init, NULL, &spi_sink_data_##inst,      \
+                        &spi_sink_config_##inst, POST_KERNEL,                  \
+                        CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &spi_sink_api);
 
 DT_INST_FOREACH_STATUS_OKAY(SPI_SINK_DEFINE)

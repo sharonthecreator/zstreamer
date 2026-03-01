@@ -38,80 +38,78 @@ struct zstreamer_sink_data {
   struct zstreamer_node_data common;
 };
 
-/**
- * @brief Sink node driver API.
- *
- * @param open    Optional. Called at boot to set up hardware.
- * @param close   Optional. Called for cleanup.
- * @param process Required. Called for each received buffer. Return 0
- *                on success; non-zero is logged as an error.
- */
-__subsystem struct zstreamer_sink_driver_api {
-  int (*open)(const struct device *dev);
-  int (*close)(const struct device *dev);
-  int (*process)(const struct device *dev, struct net_buf *buf);
-};
-
 /* Sink nodes have no start/stop — they run automatically. */
 
-/** @cond INTERNAL_HIDDEN */
+/**
+ * @brief Thread entry for sink nodes.
+ *
+ * Declared here so ZSTREAMER_SINK_CONFIG_INIT can reference it.
+ */
+extern void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3);
 
-extern int zstreamer_sink_common_init(const struct device *dev);
-
-#define Z_ZSTREAMER_SINK_CONFIG_INIT(node_id, _stack_size, _prio)              \
-  .common = {Z_ZSTREAMER_NODE_CONFIG_INIT(node_id, _stack_size, _prio,         \
-      NULL, 0)}
-
-#define Z_ZSTREAMER_SINK_DATA_INIT(inst, _stack)                               \
+/**
+ * @brief Sink node config initializer.
+ *
+ * Produces a braced initializer value for struct zstreamer_sink_config.
+ * Requires ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst) to have been called
+ * earlier.  Sets children to NULL and num_children to 0 since sinks
+ * are terminal nodes with no downstream.
+ *
+ * Usage: .common = ZSTREAMER_SINK_CONFIG_INIT(inst),
+ *
+ * @param inst  Devicetree instance number.
+ */
+#define ZSTREAMER_SINK_CONFIG_INIT(inst)                                       \
   {                                                                            \
-      .common = Z_ZSTREAMER_NODE_DATA_INIT(_stack),                            \
+    .common = {                                                                \
+      Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(DT_DRV_INST(inst),                     \
+                                        DT_INST_PROP(inst, thread_stack_size), \
+                                        DT_INST_PROP(inst, thread_priority),   \
+                                        NULL, 0, zstreamer_sink_thread_entry)  \
+    }                                                                          \
   }
 
-#define Z_ZSTREAMER_SINK_INIT_WRAPPER_DEFINE(inst, _driver_init)               \
-  static int zstreamer_sink_init_##inst(const struct device *dev) {            \
-    int (*init_fn)(const struct device *) = _driver_init;                      \
-    if (init_fn != NULL) {                                                     \
-      int ret = init_fn(dev);                                                  \
-      if (ret != 0) {                                                          \
-        return ret;                                                            \
-      }                                                                        \
-    }                                                                          \
-    return zstreamer_sink_common_init(dev);                                    \
+/**
+ * @brief Sink node data initializer.
+ *
+ * Produces a braced initializer value for struct zstreamer_sink_data.
+ * Requires ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst) to have been called
+ * earlier so that the stack symbol is visible.  Zephyr runtime fields
+ * are initialized later by zstreamer_node_common_init().
+ *
+ * Usage: .common = ZSTREAMER_SINK_DATA_INIT(inst),
+ *
+ * @param inst  Devicetree instance number.
+ */
+#define ZSTREAMER_SINK_DATA_INIT(inst)                                         \
+  {                                                                            \
+      .common = {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_sink, inst)},       \
   }
 
 /**
  * @brief Pre-define the thread stack for a sink node instance.
  *
- * Call this BEFORE defining the driver's data struct so the stack
- * symbol is visible to the initialiser.
+ * Emits the static symbol required by ZSTREAMER_SINK_DATA_INIT:
+ *   - zstreamer_sink_stack_<inst>  (thread stack)
+ *
+ * Sinks have no children array.  Must be called BEFORE defining the
+ * driver's data/config structs so the stack symbol is visible.
+ *
+ * @param inst     Devicetree instance number.
+ * @param node_id  Devicetree node identifier.
  */
 #define ZSTREAMER_SINK_DT_PRE_DEFINE(inst, node_id)                            \
   static K_THREAD_STACK_DEFINE(zstreamer_sink_stack_##inst,                    \
                                DT_PROP(node_id, thread_stack_size))
 
+/**
+ * @brief Convenience wrapper for ZSTREAMER_SINK_DT_PRE_DEFINE using
+ *        DT_DRV_INST.
+ *
+ * @param inst  Devicetree instance number.
+ */
 #define ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst)                                \
   ZSTREAMER_SINK_DT_PRE_DEFINE(inst, DT_DRV_INST(inst))
-
-/**
- * @brief Define a zstreamer sink node device from a DT node identifier.
- *
- * No children array is generated — sinks are terminal.
- * The thread stack must already have been emitted with
- * ZSTREAMER_SINK_DT_PRE_DEFINE / ZSTREAMER_SINK_DT_INST_PRE_DEFINE.
- */
-#define ZSTREAMER_SINK_DT_DEFINE(inst, node_id, init_fn, data_ptr, cfg_ptr,    \
-                                  api_ptr)                                      \
-  Z_ZSTREAMER_SINK_INIT_WRAPPER_DEFINE(inst, init_fn)                          \
-  DEVICE_DT_DEFINE(node_id, zstreamer_sink_init_##inst, NULL, data_ptr,        \
-                   cfg_ptr, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,   \
-                   api_ptr)
-
-#define ZSTREAMER_SINK_DT_INST_DEFINE(inst, init_fn, data_ptr, cfg_ptr,        \
-                                       api_ptr)                                 \
-  ZSTREAMER_SINK_DT_DEFINE(inst, DT_DRV_INST(inst), init_fn, data_ptr,         \
-                           cfg_ptr, api_ptr)
-
-/** @endcond */
 
 /**
  * @}
