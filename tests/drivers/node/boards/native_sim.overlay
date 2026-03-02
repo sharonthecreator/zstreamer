@@ -14,6 +14,7 @@
 			children = <&passthrough>;
 			thread-stack-size = <2048>;
 			thread-priority = <10>;
+			sleep-ms = <10>;
 		};
 
 		passthrough: passthrough {

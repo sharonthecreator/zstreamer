@@ -10,6 +10,7 @@
 
 #include <zstreamer/node.h>
 #include <zstreamer/source.h>
+#include <zstreamer_test/helpers.h>
 
 #include "count_sink.h"
 
@@ -60,6 +61,8 @@ ZTEST(zstreamer_filter, test_filter_routing) {
 
   zassert_true(true_bufs > 0, "true path received no buffers");
   zassert_true(false_bufs > 0, "false path received no buffers");
+
+  assert_pool_free(graph_dev);
 }
 
 ZTEST(zstreamer_filter, test_filter_balanced) {
@@ -85,6 +88,8 @@ ZTEST(zstreamer_filter, test_filter_balanced) {
                                   : (false_bufs - true_bufs);
   zassert_true(diff <= 1, "unbalanced: true=%u false=%u diff=%u", true_bufs,
                false_bufs, diff);
+
+  assert_pool_free(graph_dev);
 }
 
 ZTEST(zstreamer_filter, test_filter_restart_cycle) {
@@ -108,6 +113,8 @@ ZTEST(zstreamer_filter, test_filter_restart_cycle) {
 
     zassert_true(true_bufs > 0, "cycle %d: true path empty", cycle);
     zassert_true(false_bufs > 0, "cycle %d: false path empty", cycle);
+
+    assert_pool_free(graph_dev);
   }
 }
 
@@ -135,4 +142,6 @@ ZTEST(zstreamer_filter, test_filter_high_throughput) {
                                   : (false_bufs - true_bufs);
   zassert_true(diff <= 1, "unbalanced after high throughput: true=%u false=%u",
                true_bufs, false_bufs);
+
+  assert_pool_free(graph_dev);
 }

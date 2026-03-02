@@ -1,26 +1,53 @@
-# zstreamer Project Memory
+# zstreamer Project Rules
+
+## Architecture
+
+Node type hierarchy — all extend `node.h` base config/data:
+- **source** (`source.h`): active producer, start/stop lifecycle
+- **sink** (`sink.h`): terminal consumer, unrefs buffers
+- **filter** (`filter.h`): conditional routing via children + false-children
+- **processor**: uses `node.h` directly, no extra header
+
+Source drivers MUST use `zstreamer_source_common_init` (not `zstreamer_node_common_init`) — inits semaphores before thread creation.
+
+Every driver must call `ZSTREAMER_*_DT_INST_PRE_DEFINE(inst)` BEFORE defining data/config structs.
+
+## Naming
+
+**Family_Action** everywhere: files, structs, functions, macros, DTS compatibles.
+Examples: `numgen_src`, `count_sink`, `odd_filter`, `spi_src`, `zstreamer,numgen-src`.
+
+## DTS
+
+- Nodes live inside a `streaming-graph` container (no `#address-cells`/`reg`)
+- Peripherals referenced via phandles; don't duplicate device config in zstnode DTS
+
+## Tests
+
+| Suite | Dir | Pipeline | Tests |
+|-------|-----|----------|-------|
+| `zstreamer_node` | `tests/drivers/node/` | numgen → passthrough → count-sink | 10 |
+| `zstreamer_filter` | `tests/drivers/filter/` | numgen → odd-filter → {true,false} count-sinks | 5 |
+| `zstreamer_node_spi` | `tests/drivers/spi/` | spi-src → spi-sink (emulated) | 10 |
+| `zstreamer_node_uart` | `tests/drivers/uart/` | uart-src → uart-sink (emulated) | 10 |
+
+Test drivers: `numgen_src` (incrementing bytes, DTS-configurable `sleep-ms`), `count_sink` (atomic buf/byte counters), `passthrough_node`, `odd_filter`, `fake_sink`.
+
+Conventions: cleanup via `zstreamer_source_stop()` + `count_sink_reset()`. Device refs via `DT_NODELABEL()`. Shared helpers in `tests/include/zstreamer_test/helpers.h` (include via `../../include` in CMakeLists). Pool-free check (`assert_pool_free`) after stop requires `CONFIG_NET_BUF_POOL_USAGE=y`.
+
+```sh
+west build -b native_sim -d build/test-<name> tests/drivers/<name> -p always
+timeout 120s ./build/test-<name>/zephyr/zephyr.exe
+```
 
 ## Design Rules
 
-- **No DTS duplication**: Properties configurable through a normal device's DTS (e.g., SPI frequency, UART baud rate) must NOT be duplicated in the zstnode's device DTS. The zstnode should reference the device and use its existing config.
-- **Source/non-source API contract is strict**: First `zstreamer_node_start()` on a source should return `0`, second `-EALREADY`; first `zstreamer_node_stop()` should return `0`, second `-EALREADY`. Do not weaken tests to accept both codes for the same call sequence.
-- **Do not depend on `struct net_buf` internals**: avoid direct checks on fields like `buf->ref`; use public net_buf APIs and explicit state in zstreamer where needed.
-- **Keep DTS vendor registration present**: module-local compatibles using `zstreamer,*` require `dts/bindings/vendor-prefixes.txt` with a `zstreamer` entry to avoid dtc warnings/errors in stricter paths.
+- Start/stop contract: first `start()` → 0, second → `-EALREADY`; same for `stop()`
+- Use public `net_buf` APIs only
+- native_sim: simulated time advances only when ALL threads blocked — use `k_sleep`/`k_yield` in loops
+- SPI emulator: sync `transceive` only on native_sim
 
 ## Environment
 
-- Platform: Linux (build directly, no Docker)
-- Build board: `native_sim` (or `native_sim/native/64` if needed)
-- Samples/tests need `native_sim.overlay` (or `native_sim_native_64.overlay` symlinks)
-- UART emulator has RING_BUFFER_MAX_SIZE assertion failure on native_sim/native/64 — pre-existing upstream issue
-- Avoid running multiple `west build` commands in parallel against the same Zephyr tree; cache writes can collide (`ToolchainCapabilityDatabase` errors)
-- Avoid `rm -rf build` and excessive pristine builds to save time
-
-## Architecture Notes
-
-- zstnode drivers live inside a `streaming-graph` in DTS, not as children of bus controllers
-- The `streaming-graph` node does NOT use `#address-cells`/`#size-cells`/`reg` — child zstnodes use plain names (no `@N` suffix)
-- Zephyr SPI emulator (`zephyr,spi-emul-controller`) does NOT support async/signal mode - only sync `transceive`. Tests on native_sim can only test the polling path.
-- Zephyr SPI async uses `k_poll_signal` (not callbacks). Pattern: init signal, pass to `spi_*_signal()`, wait with `k_poll()`, reset signal before reuse.
-- Fixed: `tests/drivers/node` previously hung in `test_numgen_fakesink_restart_cycle` because numgen's tight generate loop prevented simulated time from advancing on native_sim. Fix: added `k_sleep(K_MSEC(1))` in `numgen_src_process()`.
-- Fixed: All driver DEFINE macros had a forward-reference issue — data/config structs referenced stack/children arrays defined later by `ZSTREAMER_*_DT_DEFINE`. Fix: added `ZSTREAMER_*_DT_INST_PRE_DEFINE()` macros that emit stack/children first; every driver calls this before its data/config struct definitions.
+- Linux, no Docker. Board: `native_sim`
+- No parallel `west build` against same Zephyr tree

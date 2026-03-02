@@ -8,3 +8,11 @@ description: |
 compatible: "zstreamer,numgen-src"
 
 include: zstreamer,src.yaml
+
+properties:
+  sleep-ms:
+    type: int
+    default: 1
+    description: |
+      Milliseconds to sleep after filling each buffer. Controls the
+      production rate and allows simulated time to advance on native_sim.

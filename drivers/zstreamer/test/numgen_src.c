@@ -13,6 +13,11 @@
 
 LOG_MODULE_REGISTER(numgen_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 
+struct numgen_src_config {
+  struct zstreamer_source_config common;
+  uint32_t sleep_ms;
+};
+
 struct numgen_src_data {
   struct zstreamer_source_data common;
   uint8_t counter;
@@ -20,13 +25,14 @@ struct numgen_src_data {
 
 static int numgen_src_process(const struct device *dev, struct net_buf *buf) {
   struct numgen_src_data *data = dev->data;
+  const struct numgen_src_config *cfg = dev->config;
 
   while (net_buf_tailroom(buf) > 0) {
     net_buf_add_u8(buf, data->counter++);
   }
 
   /* Allow simulated time to advance on native_sim / POSIX targets. */
-  k_sleep(K_MSEC(1));
+  k_sleep(K_MSEC(cfg->sleep_ms));
 
   return 0;
 }
@@ -39,8 +45,10 @@ static const struct zstreamer_node_driver_api numgen_src_api = {
   ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst);                                   \
   static struct numgen_src_data numgen_src_data_##inst = {                     \
       .common = ZSTREAMER_SOURCE_DATA_INIT(inst), .counter = 0};               \
-  static const struct zstreamer_source_config numgen_src_config_##inst =       \
-      ZSTREAMER_SOURCE_CONFIG_INIT(inst);                                      \
+  static const struct numgen_src_config numgen_src_config_##inst = {           \
+      .common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),                            \
+      .sleep_ms = DT_INST_PROP(inst, sleep_ms),                                \
+  };                                                                           \
   DEVICE_DT_INST_DEFINE(inst, zstreamer_source_common_init, NULL,              \
                         &numgen_src_data_##inst, &numgen_src_config_##inst,    \
                         POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
