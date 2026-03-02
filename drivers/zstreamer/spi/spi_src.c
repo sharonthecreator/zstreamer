@@ -169,7 +169,7 @@ static int spi_src_init(const struct device *dev) {
                     &data->sig);
   spi_src_open_async(dev);
 #endif
-  return zstreamer_node_common_init(dev);
+  return zstreamer_source_common_init(dev);
 }
 
 #define SPI_DEV_NODE(inst) DT_INST_PHANDLE(inst, spi_device)

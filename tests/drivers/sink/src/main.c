@@ -82,3 +82,44 @@ ZTEST(zstreamer_sink, test_sink_byte_count) {
                 "bytes %u != bufs %u * buffer_size %u", bytes, bufs,
                 BUFFER_SIZE);
 }
+
+ZTEST(zstreamer_sink, test_sink_high_throughput) {
+  int ret;
+  uint32_t bufs, bytes;
+
+  ret = zstreamer_source_start(src_dev);
+  zassert_equal(ret, 0, "src start: %d", ret);
+
+  k_msleep(2000);
+
+  ret = zstreamer_source_stop(src_dev);
+  zassert_equal(ret, 0, "src stop: %d", ret);
+
+  bufs = count_sink_get_buf_count(sink_dev);
+  bytes = count_sink_get_byte_count(sink_dev);
+
+  zassert_true(bufs >= 50, "expected >= 50 bufs, got %u", bufs);
+  zassert_equal(bytes, bufs * BUFFER_SIZE,
+                "byte count %u != bufs %u * %u", bytes, bufs, BUFFER_SIZE);
+}
+
+ZTEST(zstreamer_sink, test_sink_10k_buffers) {
+  int ret;
+  uint32_t bufs, bytes;
+
+  ret = zstreamer_source_start(src_dev);
+  zassert_equal(ret, 0, "src start: %d", ret);
+
+  /* numgen produces ~1 buf / 20ms, need ~200s for 10k bufs */
+  k_msleep(250000);
+
+  ret = zstreamer_source_stop(src_dev);
+  zassert_equal(ret, 0, "src stop: %d", ret);
+
+  bufs = count_sink_get_buf_count(sink_dev);
+  bytes = count_sink_get_byte_count(sink_dev);
+
+  zassert_true(bufs >= 10000, "expected >= 10000 bufs, got %u", bufs);
+  zassert_equal(bytes, bufs * BUFFER_SIZE,
+                "byte integrity: %u != %u * %u", bytes, bufs, BUFFER_SIZE);
+}

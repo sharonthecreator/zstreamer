@@ -62,6 +62,15 @@ int zstreamer_source_start(const struct device *dev);
 int zstreamer_source_stop(const struct device *dev);
 
 /**
+ * @brief Common init for source nodes.
+ *
+ * Initialises source-specific semaphores, then calls
+ * zstreamer_node_common_init().  Use this as the Zephyr init function
+ * for source drivers instead of zstreamer_node_common_init().
+ */
+extern int zstreamer_source_common_init(const struct device *dev);
+
+/**
  * @brief Thread entry for source nodes.
  *
  * Declared here so ZSTREAMER_SOURCE_CONFIG_INIT can reference it.

@@ -144,7 +144,7 @@ static int uart_src_init(const struct device *dev) {
     LOG_INF("DMA not available for %s, using polling", cfg->uart_dev->name);
   }
 #endif
-  return zstreamer_node_common_init(dev);
+  return zstreamer_source_common_init(dev);
 }
 
 #define UART_SRC_DEFINE(inst)                                                  \

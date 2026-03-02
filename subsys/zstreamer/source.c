@@ -28,9 +28,6 @@ void zstreamer_source_thread_entry(void *p1, void *p2, void *p3) {
   ARG_UNUSED(p2);
   ARG_UNUSED(p3);
 
-  k_sem_init(&data->run_sem, 0, 1);
-  k_sem_init(&data->idle_sem, 0, 1);
-
   while (true) {
     k_sem_take(&data->run_sem, K_FOREVER);
 
@@ -38,6 +35,7 @@ void zstreamer_source_thread_entry(void *p1, void *p2, void *p3) {
       struct net_buf *buf = zstreamer_node_alloc_buf(dev, K_MSEC(100));
 
       if (buf == NULL) {
+        k_yield();
         continue;
       }
 
@@ -56,6 +54,20 @@ void zstreamer_source_thread_entry(void *p1, void *p2, void *p3) {
 
     k_sem_give(&data->idle_sem);
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Init                                                                */
+/* ------------------------------------------------------------------ */
+
+int zstreamer_source_common_init(const struct device *dev) {
+  struct zstreamer_source_data *data =
+      (struct zstreamer_source_data *)dev->data;
+
+  k_sem_init(&data->run_sem, 0, 1);
+  k_sem_init(&data->idle_sem, 0, 1);
+
+  return zstreamer_node_common_init(dev);
 }
 
 /* ------------------------------------------------------------------ */

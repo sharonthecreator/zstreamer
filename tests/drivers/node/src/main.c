@@ -73,3 +73,44 @@ ZTEST(zstreamer_processor, test_processor_restart_cycle) {
     zassert_true(bufs > 0, "cycle %d: no buffers", cycle);
   }
 }
+
+ZTEST(zstreamer_processor, test_processor_high_throughput) {
+  int ret;
+  uint32_t bufs;
+
+  ret = zstreamer_source_start(src_dev);
+  zassert_equal(ret, 0, "src start: %d", ret);
+
+  k_msleep(5000);
+
+  ret = zstreamer_source_stop(src_dev);
+  zassert_equal(ret, 0, "src stop: %d", ret);
+
+  bufs = count_sink_get_buf_count(sink_dev);
+  zassert_true(bufs >= 100,
+               "expected >= 100 bufs through processor, got %u", bufs);
+}
+
+ZTEST(zstreamer_processor, test_processor_sustained_restart) {
+  uint32_t total_bufs = 0;
+
+  for (int cycle = 0; cycle < 30; cycle++) {
+    int ret;
+
+    count_sink_reset(sink_dev);
+
+    ret = zstreamer_source_start(src_dev);
+    zassert_equal(ret, 0, "cycle %d start: %d", cycle, ret);
+
+    k_msleep(50);
+
+    ret = zstreamer_source_stop(src_dev);
+    zassert_equal(ret, 0, "cycle %d stop: %d", cycle, ret);
+
+    total_bufs += count_sink_get_buf_count(sink_dev);
+  }
+
+  zassert_true(total_bufs >= 30,
+               "expected >= 30 total bufs across 30 cycles, got %u",
+               total_bufs);
+}

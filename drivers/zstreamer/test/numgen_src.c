@@ -41,7 +41,7 @@ static const struct zstreamer_node_driver_api numgen_src_api = {
       .common = ZSTREAMER_SOURCE_DATA_INIT(inst), .counter = 0};               \
   static const struct zstreamer_source_config numgen_src_config_##inst =       \
       ZSTREAMER_SOURCE_CONFIG_INIT(inst);                                      \
-  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,                \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_source_common_init, NULL,              \
                         &numgen_src_data_##inst, &numgen_src_config_##inst,    \
                         POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
                         &numgen_src_api);

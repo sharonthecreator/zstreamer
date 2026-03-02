@@ -153,7 +153,7 @@ static int adc_src_init(const struct device *dev) {
   LOG_INF("ADC source %s initialized: %u Hz, %u-bit, %u ch", dev->name,
           cfg->sample_rate_hz, cfg->resolution, cfg->num_channels);
 
-  return zstreamer_node_common_init(dev);
+  return zstreamer_source_common_init(dev);
 }
 
 /**

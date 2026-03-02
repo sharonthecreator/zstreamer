@@ -96,3 +96,42 @@ ZTEST(zstreamer_source, test_restart_cycle) {
     zassert_true(bufs > 0, "cycle %d: no buffers", cycle);
   }
 }
+
+ZTEST(zstreamer_source, test_high_throughput) {
+  int ret;
+  uint32_t bufs, bytes;
+
+  ret = zstreamer_source_start(src_dev);
+  zassert_equal(ret, 0, "src start: %d", ret);
+
+  k_msleep(2000);
+
+  ret = zstreamer_source_stop(src_dev);
+  zassert_equal(ret, 0, "src stop: %d", ret);
+
+  bufs = count_sink_get_buf_count(sink_dev);
+  bytes = count_sink_get_byte_count(sink_dev);
+
+  zassert_true(bufs >= 50, "expected >= 50 bufs, got %u", bufs);
+  zassert_true(bytes >= 3200, "expected >= 3200 bytes, got %u", bytes);
+}
+
+ZTEST(zstreamer_source, test_sustained_restart) {
+  for (int cycle = 0; cycle < 20; cycle++) {
+    int ret;
+    uint32_t bufs;
+
+    count_sink_reset(sink_dev);
+
+    ret = zstreamer_source_start(src_dev);
+    zassert_equal(ret, 0, "cycle %d start: %d", cycle, ret);
+
+    k_msleep(50);
+
+    ret = zstreamer_source_stop(src_dev);
+    zassert_equal(ret, 0, "cycle %d stop: %d", cycle, ret);
+
+    bufs = count_sink_get_buf_count(sink_dev);
+    zassert_true(bufs > 0, "cycle %d: no buffers", cycle);
+  }
+}

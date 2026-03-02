@@ -9,12 +9,9 @@
 
 ## Environment
 
-- Zephyr source tree: `~/Projects/zephyrcreator/zephyr`
-- Docker container `amazing_wescoff` (zephyrprojectrtos/zephyr-build) for native_sim builds (macOS can't build POSIX arch)
-- Docker workspace: `/workdir/zstreamer` (bind-mounted)
-- On aarch64 Docker, use `native_sim/native/64` — 32-bit `native_sim` fails
-- Samples/tests need `native_sim_native_64.overlay` (symlinks to `native_sim.overlay` work)
-- Twister in Docker uses `/usr/bin/dtc` which errors on vendor prefixes; `west build` uses SDK dtc which only warns — build tests directly for reliability
+- Platform: Linux (build directly, no Docker)
+- Build board: `native_sim` (or `native_sim/native/64` if needed)
+- Samples/tests need `native_sim.overlay` (or `native_sim_native_64.overlay` symlinks)
 - UART emulator has RING_BUFFER_MAX_SIZE assertion failure on native_sim/native/64 — pre-existing upstream issue
 - Avoid running multiple `west build` commands in parallel against the same Zephyr tree; cache writes can collide (`ToolchainCapabilityDatabase` errors)
 - Avoid `rm -rf build` and excessive pristine builds to save time

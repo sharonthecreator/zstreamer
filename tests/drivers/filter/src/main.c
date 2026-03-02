@@ -110,3 +110,29 @@ ZTEST(zstreamer_filter, test_filter_restart_cycle) {
     zassert_true(false_bufs > 0, "cycle %d: false path empty", cycle);
   }
 }
+
+ZTEST(zstreamer_filter, test_filter_high_throughput) {
+  int ret;
+  uint32_t true_bufs, false_bufs, total, diff;
+
+  ret = zstreamer_source_start(src_dev);
+  zassert_equal(ret, 0, "src start: %d", ret);
+
+  k_msleep(5000);
+
+  ret = zstreamer_source_stop(src_dev);
+  zassert_equal(ret, 0, "src stop: %d", ret);
+
+  true_bufs = count_sink_get_buf_count(true_sink_dev);
+  false_bufs = count_sink_get_buf_count(false_sink_dev);
+  total = true_bufs + false_bufs;
+
+  zassert_true(total >= 100,
+               "expected >= 100 total bufs, got %u (true=%u false=%u)", total,
+               true_bufs, false_bufs);
+
+  diff = (true_bufs > false_bufs) ? (true_bufs - false_bufs)
+                                  : (false_bufs - true_bufs);
+  zassert_true(diff <= 1, "unbalanced after high throughput: true=%u false=%u",
+               true_bufs, false_bufs);
+}
