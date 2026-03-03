@@ -1,0 +1,12 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <16>;
+		buffer-size = <64>;
+	};
+};
