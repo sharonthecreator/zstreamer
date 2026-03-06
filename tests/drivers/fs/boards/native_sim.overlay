@@ -1,0 +1,69 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* Enlarge flash to give LittleFS more room for test data and rotation */
+&flash0 {
+	reg = <0x00000000 DT_SIZE_K(512)>;
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		lfs_partition: partition@0 {
+			label = "lfs";
+			reg = <0x00000000 DT_SIZE_K(512)>;
+		};
+	};
+};
+
+&flashcontroller0 {
+	reg = <0x00000000 DT_SIZE_K(512)>;
+};
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <8>;
+		buffer-size = <64>;
+
+		numgen_source: numgen-source {
+			compatible = "zstreamer,numgen-src";
+			children = <&fs_sinker>;
+			thread-stack-size = <2048>;
+			thread-priority = <10>;
+			sleep-ms = <1>;
+		};
+
+		fs_sinker: fs-sinker {
+			compatible = "zstreamer,fs-sink";
+			thread-stack-size = <2048>;
+			thread-priority = <10>;
+			mount-path = "/lfs";
+			filename-prefix = "test";
+			size-threshold = <256>;
+			file-count = <5>;
+		};
+
+		/* Slow source + time-only sink for delta-ms rotation tests */
+		numgen_delta: numgen-delta {
+			compatible = "zstreamer,numgen-src";
+			children = <&fs_sinker_delta>;
+			thread-stack-size = <2048>;
+			thread-priority = <10>;
+			sleep-ms = <100>;
+		};
+
+		fs_sinker_delta: fs-sinker-delta {
+			compatible = "zstreamer,fs-sink";
+			thread-stack-size = <2048>;
+			thread-priority = <10>;
+			mount-path = "/lfs";
+			filename-prefix = "delta";
+			delta-ms-threshold = <200>;
+			file-count = <5>;
+		};
+	};
+};

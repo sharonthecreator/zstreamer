@@ -19,6 +19,7 @@ manifest:
         name-allowlist:
           - cmsis_6
           - hal_stm32
+          - littlefs
 
   self:
     path: modules/zstreamer

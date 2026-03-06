@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 tests:
-  drivers.zstreamer.distribute:
-    tags: drivers zstreamer distribute
+  subsys.zstreamer.node:
+    tags: subsys zstreamer node
     platform_allow:
       - native_sim

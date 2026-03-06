@@ -26,8 +26,10 @@ Examples: `numgen_src`, `count_sink`, `odd_filter`, `spi_src`, `zstreamer,numgen
 
 | Suite | Dir | Pipeline | Tests |
 |-------|-----|----------|-------|
-| `zstreamer_node` | `tests/drivers/node/` | numgen → passthrough → count-sink | 10 |
-| `zstreamer_filter` | `tests/drivers/filter/` | numgen → odd-filter → {true,false} count-sinks | 5 |
+| `zstreamer_node` | `tests/subsys/node/` | numgen → passthrough → count-sink | 10 |
+| `zstreamer_filter` | `tests/subsys/filter/` | numgen → odd-filter → {true,false} count-sinks | 5 |
+| `zstreamer_distribute` | `tests/subsys/distribute/` | unit-test buffer distribution (fake devices) | 8 |
+| `zstreamer_fs` | `tests/drivers/fs/` | numgen → fs-sink (LittleFS on flash sim) | 12 |
 | `zstreamer_node_spi` | `tests/drivers/spi/` | spi-src → spi-sink (emulated) | 10 |
 | `zstreamer_node_uart` | `tests/drivers/uart/` | uart-src → uart-sink (emulated) | 10 |
 
@@ -36,6 +38,9 @@ Test drivers: `numgen_src` (incrementing bytes, DTS-configurable `sleep-ms`), `c
 Conventions: cleanup via `zstreamer_source_stop()` + `count_sink_reset()`. Device refs via `DT_NODELABEL()`. Shared helpers in `tests/include/zstreamer_test/helpers.h` (include via `../../include` in CMakeLists). Pool-free check (`assert_pool_free`) after stop requires `CONFIG_NET_BUF_POOL_USAGE=y`.
 
 ```sh
+# Subsystem tests
+west build -b native_sim -d build/test-<name> tests/subsys/<name> -p always
+# Driver tests
 west build -b native_sim -d build/test-<name> tests/drivers/<name> -p always
 timeout 120s ./build/test-<name>/zephyr/zephyr.exe
 ```
