@@ -9,4 +9,6 @@ rsource "adc/Kconfig"
 
 rsource "fs/Kconfig"
 
+rsource "pwm/Kconfig"
+
 rsource "test/Kconfig"

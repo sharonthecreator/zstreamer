@@ -1,0 +1,12 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: Sine wave to PWM
+  description: |
+    Demonstrates a sine-src → pwm-sink streaming pipeline that drives
+    an LED brightness via PWM using a time-based sine wave.
+tests:
+  sample.zstreamer.sine2pwm:
+    tags: zstreamer
+    platform_allow: nucleo_l432kc

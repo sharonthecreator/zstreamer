@@ -1,0 +1,20 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Sine wave source node. Produces a sine waveform as unsigned bytes
+  (0-255, centered at 128) based on wall-clock time. The cycle-ms
+  property sets the duration of one full sine period in milliseconds.
+  Software-only test node.
+
+compatible: "zstreamer,sine-src"
+
+include: zstreamer,src.yaml
+
+properties:
+  cycle-ms:
+    type: int
+    default: 1000
+    description: |
+      Duration of one full sine cycle in milliseconds. For example,
+      cycle-ms = 500 produces a 2 Hz sine wave.

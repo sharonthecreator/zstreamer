@@ -1,0 +1,36 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	fake_pwm: fake-pwm {
+		compatible = "zephyr,fake-pwm";
+		status = "okay";
+		#pwm-cells = <2>;
+		frequency = <10000000>;
+	};
+
+	pwm_streaming_graph: pwm-streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <8>;
+		buffer-size = <1>;
+
+		sine_source: sine-source {
+			compatible = "zstreamer,sine-src";
+			children = <&pwm_sinker>;
+			cycle-ms = <500>;
+			thread-stack-size = <1024>;
+			thread-priority = <5>;
+		};
+
+		pwm_sinker: pwm-sinker {
+			compatible = "zstreamer,pwm-sink";
+			pwms = <&fake_pwm 0 20000000>;
+			min-value = <0>;
+			max-value = <255>;
+			thread-stack-size = <1024>;
+			thread-priority = <5>;
+		};
+	};
+};

@@ -1,0 +1,31 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  PWM sink node. Maps the mean value of each received buffer to a PWM
+  duty cycle. Useful for driving LEDs or other PWM-controlled actuators
+  whose output should correlate with streamed data.
+
+compatible: "zstreamer,pwm-sink"
+
+include: zstreamer,sink.yaml
+
+properties:
+  pwms:
+    type: phandle-array
+    required: true
+    description: |
+      PWM channel to drive. Specifies the PWM controller, channel,
+      and default period in nanoseconds.
+  min-value:
+    type: int
+    default: 0
+    description: |
+      Input byte value that maps to 0% duty cycle. Values at or
+      below this produce no PWM output.
+  max-value:
+    type: int
+    default: 255
+    description: |
+      Input byte value that maps to 100% duty cycle. Values at or
+      above this produce full PWM output.

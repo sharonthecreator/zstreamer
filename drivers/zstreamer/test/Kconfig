@@ -48,3 +48,12 @@ config ZSTREAMER_TEST_ODD_FILTER
 	help
 	  Enable the odd-byte filter streaming node driver.
 	  Routes buffers based on whether the first byte is odd or even.
+
+config ZSTREAMER_TEST_SINE_SRC
+	bool "Sine wave source driver"
+	depends on DT_HAS_ZSTREAMER_SINE_SRC_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_TEST
+	help
+	  Enable the sine wave source streaming node driver.
+	  Produces a sine waveform as unsigned bytes (0-255).

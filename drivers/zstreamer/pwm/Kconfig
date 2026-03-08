@@ -1,0 +1,15 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_PWM
+	bool
+
+config ZSTREAMER_PWM_SINK
+	bool "PWM sink driver"
+	depends on DT_HAS_ZSTREAMER_PWM_SINK_ENABLED
+	depends on ZSTREAMER
+	depends on PWM
+	select ZSTREAMER_PWM
+	help
+	  Enable the PWM sink streaming node driver.
+	  Maps the mean byte value of received buffers to a PWM duty cycle.
