@@ -2,6 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 if(CONFIG_ZSTREAMER)
-  add_subdirectory(subsys/zstreamer)
-  add_subdirectory(drivers/zstreamer)
+  add_subdirectory(subsys)
+  add_subdirectory(drivers)
 endif()

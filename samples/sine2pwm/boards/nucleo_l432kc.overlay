@@ -15,6 +15,7 @@
 			compatible = "zstreamer,sine-src";
 			cycle-ms = <4000>;
 			children = <&pwm_sink>;
+			autostart;
 		};
 
 		pwm_sink: pwm-sink {

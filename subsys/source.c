@@ -63,11 +63,20 @@ void zstreamer_source_thread_entry(void *p1, void *p2, void *p3) {
 int zstreamer_source_common_init(const struct device *dev) {
   struct zstreamer_source_data *data =
       (struct zstreamer_source_data *)dev->data;
+  const struct zstreamer_source_config *cfg =
+      (const struct zstreamer_source_config *)dev->config;
 
   k_sem_init(&data->run_sem, 0, 1);
   k_sem_init(&data->idle_sem, 0, 1);
 
-  return zstreamer_node_common_init(dev);
+  int ret = zstreamer_node_common_init(dev);
+
+  if (ret == 0 && cfg->autostart) {
+    LOG_INF("[%s] autostart enabled", dev->name);
+    ret = zstreamer_source_start(dev);
+  }
+
+  return ret;
 }
 
 /* ------------------------------------------------------------------ */

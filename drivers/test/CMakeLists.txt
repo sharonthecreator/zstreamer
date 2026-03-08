@@ -4,7 +4,6 @@
 zephyr_library()
 
 zephyr_include_directories(${ZEPHYR_ZSTREAMER_MODULE_DIR}/include)
-zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_TEST_NUMGEN_SRC numgen_src.c)
 zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_TEST_FAKE_SINK fake_sink.c)

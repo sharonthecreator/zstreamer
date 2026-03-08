@@ -9,3 +9,10 @@ description: |
 compatible: "zstreamer,src"
 
 include: zstreamer,node.yaml
+
+properties:
+  autostart:
+    type: boolean
+    description: |
+      If present, the source node starts generating immediately at boot
+      without requiring an explicit zstreamer_source_start() call.

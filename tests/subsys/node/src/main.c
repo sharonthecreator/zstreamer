@@ -11,7 +11,7 @@
 #include <zstreamer/source.h>
 #include <zstreamer_test/helpers.h>
 
-#include "count_sink.h"
+#include <zstreamer/test/count_sink.h>
 
 /* ------------------------------------------------------------------ */
 /* Pipeline: numgen → passthrough → count_sinker  (64-byte bufs)      */

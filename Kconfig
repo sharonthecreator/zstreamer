@@ -11,7 +11,7 @@ menuconfig ZSTREAMER
 
 if ZSTREAMER
 
-rsource "subsys/zstreamer/Kconfig"
-rsource "drivers/zstreamer/Kconfig"
+rsource "subsys/Kconfig"
+rsource "drivers/Kconfig"
 
 endif # ZSTREAMER

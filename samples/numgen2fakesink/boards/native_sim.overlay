@@ -15,6 +15,7 @@
 		numgen_source: numgen-source {
 			compatible = "zstreamer,numgen-src";
 			children = <&fake_sinker>;
+			autostart;
 		};
 
 		fake_sinker: fake-sinker {

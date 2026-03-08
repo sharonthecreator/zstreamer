@@ -47,6 +47,7 @@
 			compatible = "zstreamer,uart-src";
 			uart-device = <&usart2>;
 			children = <&uart_sinker>;
+			autostart;
 		};
 
 		uart_sinker: uart-sinker {

@@ -30,6 +30,7 @@ extern "C" {
 
 struct zstreamer_source_config {
   struct zstreamer_node_config common;
+  bool autostart;
 };
 
 struct zstreamer_source_data {
@@ -97,7 +98,8 @@ extern void zstreamer_source_thread_entry(void *p1, void *p2, void *p3);
           zstreamer_source_children_##inst,                                    \
           Z_ZSTREAMER_NUM_CHILDREN(DT_DRV_INST(inst)),                         \
           zstreamer_source_thread_entry)                                       \
-    }                                                                          \
+    },                                                                         \
+    .autostart = DT_INST_PROP_OR(inst, autostart, false),                      \
   }
 
 /**

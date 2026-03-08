@@ -67,6 +67,7 @@
 			buffer-samples = <256>;
 			dma-buffer-samples = <512>;
 			children = <&fake_sinker>;
+			autostart;
 			thread-stack-size = <2048>;
 			thread-priority = <5>;
 		};

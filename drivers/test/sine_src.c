@@ -13,8 +13,6 @@
 
 #include <zstreamer/source.h>
 
-#include "sine_src.h"
-
 LOG_MODULE_REGISTER(sine_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 #ifndef M_PI
@@ -46,11 +44,6 @@ static int sine_src_process(const struct device *dev, struct net_buf *buf) {
   k_sleep(K_MSEC(1));
 
   return 0;
-}
-
-void sine_src_reset(const struct device *dev) {
-  ARG_UNUSED(dev);
-  /* Time-based sine has no state to reset. */
 }
 
 static const struct zstreamer_node_driver_api sine_src_api = {

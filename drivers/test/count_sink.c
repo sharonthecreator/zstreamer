@@ -11,7 +11,7 @@
 
 #include <zstreamer/sink.h>
 
-#include "count_sink.h"
+#include <zstreamer/test/count_sink.h>
 
 LOG_MODULE_REGISTER(count_sink, CONFIG_ZSTREAMER_LOG_LEVEL);
 

@@ -12,7 +12,7 @@
 #include <zstreamer/source.h>
 #include <zstreamer_test/helpers.h>
 
-#include "count_sink.h"
+#include <zstreamer/test/count_sink.h>
 
 #define GRAPH_NODE DT_NODELABEL(streaming_graph)
 #define SRC_NODE DT_NODELABEL(numgen_source)

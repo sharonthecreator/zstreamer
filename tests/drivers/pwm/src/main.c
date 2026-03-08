@@ -24,8 +24,6 @@
 
 #include <zstreamer_test/helpers.h>
 
-#include <sine_src.h>
-
 DEFINE_FFF_GLOBALS;
 
 #define GRAPH_NODE DT_NODELABEL(pwm_streaming_graph)

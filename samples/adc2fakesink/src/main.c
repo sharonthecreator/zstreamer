@@ -15,22 +15,9 @@ LOG_MODULE_REGISTER(adc2fakesink, LOG_LEVEL_INF);
 
 int main(void) {
   const struct device *adc_src = DEVICE_DT_GET(ADC_SRC_NODE);
-  int ret;
 
-  LOG_INF("ADC to FakeSink sample");
-
-  if (!device_is_ready(adc_src)) {
-    LOG_ERR("ADC source device not ready");
-    return -ENODEV;
-  }
-
-  ret = zstreamer_source_start(adc_src);
-  if (ret) {
-    LOG_ERR("Failed to start pipeline: %d", ret);
-    return ret;
-  }
-
-  LOG_INF("ADC capture pipeline running");
+  /* Pipeline starts automatically via DTS autostart property. */
+  LOG_INF("ADC capture pipeline running (autostart)");
 
   /* Let it run for a while, then stop */
   k_sleep(K_SECONDS(10));
