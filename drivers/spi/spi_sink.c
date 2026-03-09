@@ -160,7 +160,7 @@ static int spi_sink_init(const struct device *dev) {
   static const struct spi_sink_config spi_sink_config_##inst = {               \
       .common = ZSTREAMER_SINK_CONFIG_INIT(inst),                              \
       .spi = SPI_DT_SPEC_GET(SPI_DEV_NODE(inst),                               \
-                             SPI_OP_MODE_MASTER | SPI_WORD_SET(8), 0),         \
+                             SPI_OP_MODE_MASTER | SPI_WORD_SET(8)),            \
   };                                                                           \
   DEVICE_DT_INST_DEFINE(inst, spi_sink_init, NULL, &spi_sink_data_##inst,      \
                         &spi_sink_config_##inst, POST_KERNEL,                  \

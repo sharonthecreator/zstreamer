@@ -182,7 +182,7 @@ static int spi_src_init(const struct device *dev) {
   static const struct spi_src_config spi_src_config_##inst = {                 \
       .common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),                            \
       .spi = SPI_DT_SPEC_GET(SPI_DEV_NODE(inst),                               \
-                             SPI_OP_MODE_MASTER | SPI_WORD_SET(8), 0),         \
+                             SPI_OP_MODE_MASTER | SPI_WORD_SET(8)),            \
       .rx_length = DT_INST_PROP(inst, rx_length),                              \
   };                                                                           \
   DEVICE_DT_INST_DEFINE(inst, spi_src_init, NULL, &spi_src_data_##inst,        \
