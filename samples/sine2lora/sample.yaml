@@ -1,0 +1,13 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: Sine wave to LoRa
+  description: |
+    Demonstrates a sine-src -> {lora-sink, pwm-sink} streaming pipeline
+    that transmits a time-based sine wave over LoRa while driving the
+    red LED brightness via PWM.
+tests:
+  sample.zstreamer.sine2lora:
+    tags: zstreamer
+    platform_allow: nucleo_wl55jc

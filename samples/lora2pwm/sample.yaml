@@ -1,0 +1,12 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: LoRa to PWM
+  description: |
+    Demonstrates a lora-src -> pwm-sink streaming pipeline.
+    Received LoRa data drives the blue and red LEDs via PWM.
+tests:
+  sample.zstreamer.lora2pwm:
+    tags: zstreamer
+    platform_allow: nucleo_wl55jc

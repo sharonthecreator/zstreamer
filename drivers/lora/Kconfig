@@ -1,0 +1,25 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_LORA
+	bool
+
+config ZSTREAMER_LORA_SRC
+	bool "LoRa source driver"
+	depends on DT_HAS_ZSTREAMER_LORA_SRC_ENABLED
+	depends on ZSTREAMER
+	depends on LORA
+	select ZSTREAMER_LORA
+	help
+	  Enable the LoRa source streaming node driver.
+	  Receives LoRa packets and produces buffers.
+
+config ZSTREAMER_LORA_SINK
+	bool "LoRa sink driver"
+	depends on DT_HAS_ZSTREAMER_LORA_SINK_ENABLED
+	depends on ZSTREAMER
+	depends on LORA
+	select ZSTREAMER_LORA
+	help
+	  Enable the LoRa sink streaming node driver.
+	  Transmits each received buffer as a LoRa packet.

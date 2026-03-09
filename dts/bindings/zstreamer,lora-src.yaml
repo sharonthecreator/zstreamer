@@ -1,0 +1,48 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  LoRa source node. Receives LoRa packets and produces buffers containing
+  the received payload bytes. Uses the Zephyr LoRa driver API with
+  blocking lora_recv().
+
+compatible: "zstreamer,lora-src"
+
+include: zstreamer,src.yaml
+
+properties:
+  lora-device:
+    type: phandle
+    required: true
+    description: |
+      Reference to the LoRa radio device node (e.g., &lora).
+  frequency:
+    type: int
+    default: 865100000
+    description: |
+      LoRa carrier frequency in Hz (e.g., 865100000 for 865.1 MHz).
+  bandwidth:
+    type: int
+    default: 0
+    description: |
+      Signal bandwidth: 0 = 125 kHz, 1 = 250 kHz, 2 = 500 kHz.
+  spreading-factor:
+    type: int
+    default: 10
+    description: |
+      Spreading factor (6-12). Higher values increase range but reduce data rate.
+  coding-rate:
+    type: int
+    default: 1
+    description: |
+      Coding rate: 1 = 4/5, 2 = 4/6, 3 = 4/7, 4 = 4/8.
+  preamble-length:
+    type: int
+    default: 8
+    description: |
+      Preamble length in symbols.
+  tx-power:
+    type: int
+    default: 14
+    description: |
+      Transmit power in dBm (used during config, though this is RX).

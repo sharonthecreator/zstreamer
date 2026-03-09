@@ -1,0 +1,48 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * LoRa receiver -> red + green PWM LEDs on Nucleo WL55JC.
+ */
+
+#include <zephyr/dt-bindings/pwm/stm32_pwm.h>
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <8>;
+		buffer-size = <1>;
+
+		lora_source: lora-source {
+			compatible = "zstreamer,lora-src";
+			lora-device = <&lora>;
+			frequency = <865100000>;
+			bandwidth = <2>;
+			spreading-factor = <7>;
+			coding-rate = <1>;
+			children = <&blue_pwm_sink &red_pwm_sink>;
+			autostart;
+		};
+
+		blue_pwm_sink: blue-pwm-sink {
+			compatible = "zstreamer,pwm-sink";
+			pwms = <&pwm1 3 PWM_MSEC(1) (PWM_POLARITY_INVERTED | PWM_STM32_COMPLEMENTARY)>;
+		};
+
+		red_pwm_sink: red-pwm-sink {
+			compatible = "zstreamer,pwm-sink";
+			pwms = <&pwm2 4 PWM_MSEC(1) PWM_POLARITY_NORMAL>;
+		};
+	};
+};
+
+/* Enable TIM1 for green LED (PB9). */
+&timers1 {
+	status = "okay";
+
+	pwm1: pwm {
+		status = "okay";
+		pinctrl-0 = <&tim1_ch3n_pb9>;
+		pinctrl-names = "default";
+	};
+};

@@ -13,4 +13,6 @@ rsource "fs/Kconfig"
 
 rsource "pwm/Kconfig"
 
+rsource "lora/Kconfig"
+
 rsource "test/Kconfig"

@@ -74,7 +74,8 @@ extern void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3);
       Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(DT_DRV_INST(inst),                     \
                                         DT_INST_PROP(inst, thread_stack_size), \
                                         DT_INST_PROP(inst, thread_priority),   \
-                                        NULL, 0, zstreamer_sink_thread_entry)  \
+                                        NULL, 0, zstreamer_sink_thread_entry), \
+      .readonly = true,                                                        \
     }                                                                          \
   }
 
