@@ -20,8 +20,6 @@
 			compatible = "zstreamer,sine-src";
 			children = <&pwm_sinker>;
 			cycle-ms = <500>;
-			thread-stack-size = <1024>;
-			thread-priority = <5>;
 		};
 
 		pwm_sinker: pwm-sinker {
@@ -29,8 +27,6 @@
 			pwms = <&fake_pwm 0 20000000>;
 			min-value = <0>;
 			max-value = <255>;
-			thread-stack-size = <1024>;
-			thread-priority = <5>;
 		};
 	};
 };

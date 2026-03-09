@@ -1,0 +1,16 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_DAC
+	bool
+
+config ZSTREAMER_DAC_SINK
+	bool "DAC sink driver"
+	depends on DT_HAS_ZSTREAMER_DAC_SINK_ENABLED
+	depends on ZSTREAMER
+	depends on DAC
+	select ZSTREAMER_DAC
+	help
+	  Enable the DAC sink streaming node driver.
+	  Writes received uint16_t samples to a DAC channel
+	  using Zephyr's portable DAC API.

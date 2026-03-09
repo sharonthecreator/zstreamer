@@ -41,6 +41,15 @@ struct zstreamer_sink_data {
 /* Sink nodes have no start/stop — they run automatically. */
 
 /**
+ * @brief Common init for sink nodes.
+ *
+ * Calls zstreamer_node_common_init().  Use this as the Zephyr init
+ * function for sink drivers instead of zstreamer_node_common_init()
+ * for consistency with zstreamer_source_common_init().
+ */
+extern int zstreamer_sink_common_init(const struct device *dev);
+
+/**
  * @brief Thread entry for sink nodes.
  *
  * Declared here so ZSTREAMER_SINK_CONFIG_INIT can reference it.

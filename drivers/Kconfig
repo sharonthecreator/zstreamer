@@ -7,6 +7,8 @@ rsource "spi/Kconfig"
 
 rsource "adc/Kconfig"
 
+rsource "dac/Kconfig"
+
 rsource "fs/Kconfig"
 
 rsource "pwm/Kconfig"

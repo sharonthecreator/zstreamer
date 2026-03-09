@@ -12,31 +12,5 @@ config ZSTREAMER_ADC_SRC
 	select ZSTREAMER_ADC
 	help
 	  Enable the ADC source streaming node driver.
-	  This driver captures ADC samples using timer-triggered DMA
-	  for precise sample rates, suitable for audio capture.
-
-if ZSTREAMER_ADC_SRC
-
-config ZSTREAMER_ADC_STM32
-	bool "STM32-specific ADC implementation"
-	default y
-	depends on SOC_FAMILY_STM32
-	depends on DMA
-	select USE_STM32_LL_ADC
-	select USE_STM32_LL_TIM
-	help
-	  Use STM32-specific implementation for timer-triggered ADC
-	  with DMA. This provides hardware-level integration between
-	  timer TRGO and ADC external trigger for precise sampling.
-
-config ZSTREAMER_ADC_DMA_BUFFER_NOCACHE
-	bool "Place ADC DMA buffer in non-cacheable region"
-	default y
-	depends on ZSTREAMER_ADC_STM32
-	depends on CPU_HAS_DCACHE
-	help
-	  On MCUs with data cache (e.g., STM32U5, STM32H7), DMA buffers
-	  must be in non-cacheable memory. Enable this to allocate the
-	  ADC DMA buffer in SRAM4 or another non-cacheable region.
-
-endif # ZSTREAMER_ADC_SRC
+	  Captures ADC samples using Zephyr's portable ADC API
+	  (blocking adc_read in the source thread).

@@ -1,0 +1,37 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  DAC sink node for zstreamer pipeline.
+
+  Receives buffers of uint16_t samples and writes each value to a DAC
+  channel using Zephyr's portable DAC API.
+
+  Example with 12-bit DAC on channel 0:
+
+    dac_sinker: dac-sinker {
+        compatible = "zstreamer,dac-sink";
+        dac-device = <&dac1>;
+        dac-channel-id = <0>;
+        dac-resolution = <12>;
+    };
+
+compatible: "zstreamer,dac-sink"
+
+include: zstreamer,sink.yaml
+
+properties:
+  dac-device:
+    type: phandle
+    required: true
+    description: DAC device to output samples to.
+
+  dac-channel-id:
+    type: int
+    default: 0
+    description: DAC channel number.
+
+  dac-resolution:
+    type: int
+    default: 12
+    description: DAC output resolution in bits.

@@ -128,12 +128,12 @@ west build -b nucleo_u575zi_q samples/uart2uart
 - [x] **ADC source** — analog-to-digital capture
 - [x] **FS sink** — write pipeline data to filesystem
 - [x] **PWM sink** — drive PWM duty cycle from pipeline data
+- [x] **DAC sink** — analog output (`sine_src -> dac_sink` = function generator)
 - [ ] **I2S source/sink** — audio streaming (mic-to-speaker, recording, DSP)
 - [ ] **BLE GATT sink/source** — wireless data over BLE notifications
 - [ ] **Sensor source** — wraps Zephyr sensor API (works with hundreds of existing drivers)
 - [ ] **USB CDC ACM** — USB serial streaming / data acquisition
 - [ ] **CAN bus** — automotive/industrial logging
-- [ ] **DAC sink** — analog output (`sine_src -> dac_sink` = function generator)
 - [ ] **TCP/UDP sockets** — network telemetry
 - [ ] **Threshold filter** — pass/block on configurable value
 - [ ] **Chunker processor** — buffer size adaptation between protocols

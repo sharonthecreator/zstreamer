@@ -4,21 +4,15 @@
  *
  * ADC-to-FakeSink sample on Nucleo U575ZI-Q.
  *
- * Captures stereo audio at 48kHz from ADC1 channels 0 and 1 (PA0, PA1 on CN10).
- * Uses TIM6 for timer-triggered sampling with DMA.
- *
- * Hardware setup:
- *   - Connect audio input to PA0 (ADC1_IN0) and PA1 (ADC1_IN1)
- *   - Use appropriate voltage divider to keep signal in 0-3.3V range
+ * Captures dual-channel 12-bit ADC data from PA0 (ADC1_IN0) and
+ * PA1 (ADC1_IN1) at ~1 kHz using Zephyr's portable ADC API.
  */
 
-/* Enable ADC1 with DMA */
 &adc1 {
 	status = "okay";
 	#address-cells = <1>;
 	#size-cells = <0>;
 
-	/* ADC channels */
 	channel@0 {
 		reg = <0>;
 		zephyr,gain = "ADC_GAIN_1";
@@ -36,46 +30,24 @@
 	};
 };
 
-/* Enable TIM6 for ADC triggering */
-&timers6 {
-	status = "okay";
-	st,prescaler = <0>;
-
-	/* Basic timer counter - used for TRGO output */
-	counter {
-		status = "okay";
-	};
-};
-
-/* Enable GPDMA1 for ADC DMA transfers */
-&gpdma1 {
-	status = "okay";
-};
-
 / {
 	streaming_graph: streaming-graph {
 		compatible = "zstreamer,graph";
 		buffer-count = <8>;
-		buffer-size = <1024>;
+		buffer-size = <512>;
 
 		adc_source: adc-source {
 			compatible = "zstreamer,adc-src";
 			io-channels = <&adc1 0>, <&adc1 1>;
-			sample-rate-hz = <48000>;
-			resolution = <12>;
-			trigger-timer = <&timers6>;
-			buffer-samples = <256>;
-			dma-buffer-samples = <512>;
+			sample-rate-hz = <1000>;
+			samples = <64>;
 			children = <&fake_sinker>;
 			autostart;
 			thread-stack-size = <2048>;
-			thread-priority = <5>;
 		};
 
 		fake_sinker: fake-sinker {
 			compatible = "zstreamer,fake-sink";
-			thread-stack-size = <1024>;
-			thread-priority = <5>;
 		};
 	};
 };

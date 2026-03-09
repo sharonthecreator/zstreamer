@@ -120,7 +120,7 @@ static int uart_sink_init(const struct device *dev) {
     LOG_INF("DMA not available for %s, using polling", cfg->uart_dev->name);
   }
 #endif
-  return zstreamer_node_common_init(dev);
+  return zstreamer_sink_common_init(dev);
 }
 
 #define UART_SINK_DEFINE(inst)                                                 \

@@ -300,7 +300,7 @@ static int fs_sink_init(const struct device *dev) {
     data->filename_cb = default_filename_cb;
   }
 
-  return zstreamer_node_common_init(dev);
+  return zstreamer_sink_common_init(dev);
 }
 
 static const struct zstreamer_node_driver_api fs_sink_api = {

@@ -16,6 +16,14 @@ LOG_MODULE_REGISTER(zstreamer_sink, CONFIG_ZSTREAMER_LOG_LEVEL);
 /* Thread entry                                                        */
 /* ------------------------------------------------------------------ */
 
+int zstreamer_sink_common_init(const struct device *dev) {
+  return zstreamer_node_common_init(dev);
+}
+
+/* ------------------------------------------------------------------ */
+/* Thread entry                                                        */
+/* ------------------------------------------------------------------ */
+
 void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3) {
   const struct device *dev = (const struct device *)p1;
   struct zstreamer_sink_data *data = (struct zstreamer_sink_data *)dev->data;

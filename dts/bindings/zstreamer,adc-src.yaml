@@ -4,22 +4,18 @@
 description: |
   ADC source node for zstreamer pipeline.
 
-  Captures ADC samples using DMA with timer-triggered sampling for precise
-  sample rates. Supports 1 or 2 channels (mono/stereo audio capture).
+  Captures ADC samples using Zephyr's portable ADC API (blocking reads
+  in the source thread).  Supports any number of channels via the
+  io-channels property.  Resolution and gain are taken from the ADC
+  channel's own DTS properties (zephyr,resolution, zephyr,gain, etc.).
 
-  The trigger-timer property specifies a timer that generates TRGO events
-  at the desired sample rate. The ADC is configured to start conversion
-  on each timer trigger, and DMA transfers samples to a circular buffer.
-
-  Example for STM32U5 at 48kHz stereo:
+  Example for dual-channel at 1 kHz:
 
     adc_source: adc-source {
         compatible = "zstreamer,adc-src";
         io-channels = <&adc1 0>, <&adc1 1>;
-        sample-rate-hz = <48000>;
-        resolution = <12>;
-        trigger-timer = <&timers6>;
-        buffer-samples = <256>;
+        sample-rate-hz = <1000>;
+        samples = <64>;
         children = <&some_sink>;
     };
 
@@ -32,51 +28,21 @@ properties:
     type: phandle-array
     required: true
     description: |
-      ADC channel(s) to sample. Specify 1 channel for mono or 2 for stereo.
-      Each entry is a phandle to an ADC device and channel number.
+      ADC channel(s) to sample.  Each entry is a phandle to an ADC
+      controller and channel number.
 
   sample-rate-hz:
     type: int
     required: true
     description: |
-      Desired sampling rate in Hz. Common audio rates: 8000, 16000, 22050,
-      44100, 48000, 96000. The actual rate depends on timer configuration
-      accuracy.
+      Target sampling rate in Hz.  The driver sleeps between read
+      batches to approximate this rate; the actual rate depends on
+      ADC conversion time.
 
-  resolution:
+  samples:
     type: int
-    default: 12
+    default: 64
     description: |
-      ADC resolution in bits. Supported values depend on the ADC hardware.
-      Common values: 8, 10, 12, 14, 16. Default is 12 bits.
-    enum:
-      - 6
-      - 8
-      - 10
-      - 12
-      - 14
-      - 16
-
-  trigger-timer:
-    type: phandle
-    required: true
-    description: |
-      Timer device used to trigger ADC conversions. The timer's TRGO output
-      is connected to the ADC external trigger input. The timer is configured
-      to generate triggers at the specified sample-rate-hz.
-
-  buffer-samples:
-    type: int
-    default: 256
-    description: |
-      Number of samples per streaming buffer. For stereo, this is the number
-      of sample pairs. Larger buffers reduce overhead but increase latency.
-      Must be a power of 2 for efficient DMA circular buffer operation.
-
-  dma-buffer-samples:
-    type: int
-    default: 512
-    description: |
-      Total samples in the DMA circular buffer. Should be 2x buffer-samples
-      for ping-pong operation. The driver uses half-transfer and complete
-      interrupts to submit buffers to the streaming pipeline.
+      Number of sample frames per streaming buffer.  Each frame
+      contains one sample per channel.  Larger values reduce overhead
+      but increase latency.

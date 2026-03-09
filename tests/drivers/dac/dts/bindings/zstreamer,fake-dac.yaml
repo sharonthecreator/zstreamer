@@ -1,0 +1,6 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: Fake DAC for testing the dac_sink driver.
+
+compatible: "zstreamer,fake-dac"

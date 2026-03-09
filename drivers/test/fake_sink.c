@@ -29,7 +29,7 @@ static const struct zstreamer_node_driver_api fake_sink_api = {
       ZSTREAMER_SINK_DATA_INIT(inst);                                          \
   static const struct zstreamer_sink_config fake_sink_config_##inst =          \
       ZSTREAMER_SINK_CONFIG_INIT(inst);                                        \
-  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,                \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_sink_common_init, NULL,                \
                         &fake_sink_data_##inst, &fake_sink_config_##inst,      \
                         POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
                         &fake_sink_api);

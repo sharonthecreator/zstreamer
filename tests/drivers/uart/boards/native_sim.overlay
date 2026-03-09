@@ -30,14 +30,12 @@
 			uart-device = <&uart_src>;
 			children = <&uart_sinker>;
 			thread-stack-size = <2048>;
-			thread-priority = <5>;
 		};
 
 		uart_sinker: uart-sinker {
 			compatible = "zstreamer,uart-sink";
 			uart-device = <&uart_sink>;
 			thread-stack-size = <2048>;
-			thread-priority = <5>;
 		};
 	};
 };

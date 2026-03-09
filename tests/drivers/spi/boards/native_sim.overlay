@@ -34,15 +34,11 @@
 			spi-device = <&spi_test_rx>;
 			children = <&spi_sinker>;
 			rx-length = <64>;
-			thread-stack-size = <1024>;
-			thread-priority = <5>;
 		};
 
 		spi_sinker: spi-sinker {
 			compatible = "zstreamer,spi-sink";
 			spi-device = <&spi_test_tx>;
-			thread-stack-size = <1024>;
-			thread-priority = <5>;
 		};
 	};
 };

@@ -1,0 +1,44 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	fake_dac: fake-dac {
+		compatible = "zstreamer,fake-dac";
+		status = "okay";
+	};
+
+	fake_dac_8bit: fake-dac-8bit {
+		compatible = "zstreamer,fake-dac";
+		status = "okay";
+	};
+
+	dac_streaming_graph: dac-streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <8>;
+		buffer-size = <128>;
+
+		numgen: numgen-source {
+			compatible = "zstreamer,numgen-src";
+			sleep-ms = <1>;
+			children = <&dac_sinker>, <&dac_sinker_8bit>;
+		};
+
+		/* 12-bit sink */
+		dac_sinker: dac-sinker {
+			compatible = "zstreamer,dac-sink";
+			dac-device = <&fake_dac>;
+			dac-channel-id = <0>;
+			dac-resolution = <12>;
+		};
+
+		/* 8-bit sink */
+		dac_sinker_8bit: dac-sinker-8bit {
+			compatible = "zstreamer,dac-sink";
+			dac-device = <&fake_dac_8bit>;
+			dac-channel-id = <0>;
+			dac-resolution = <8>;
+		};
+	};
+};

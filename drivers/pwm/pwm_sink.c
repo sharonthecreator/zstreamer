@@ -74,7 +74,7 @@ static const struct zstreamer_node_driver_api pwm_sink_api = {
       .min_value = DT_INST_PROP(inst, min_value),                              \
       .max_value = DT_INST_PROP(inst, max_value),                              \
   };                                                                           \
-  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,                \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_sink_common_init, NULL,                \
                         &pwm_sink_data_##inst, &pwm_sink_config_##inst,        \
                         POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
                         &pwm_sink_api);

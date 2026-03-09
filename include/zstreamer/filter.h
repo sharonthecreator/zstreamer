@@ -39,6 +39,15 @@ struct zstreamer_filter_data {
 };
 
 /**
+ * @brief Common init for filter nodes.
+ *
+ * Calls zstreamer_node_common_init().  Use this as the Zephyr init
+ * function for filter drivers instead of zstreamer_node_common_init()
+ * for consistency with zstreamer_source_common_init().
+ */
+extern int zstreamer_filter_common_init(const struct device *dev);
+
+/**
  * @brief Thread entry for filter nodes.
  *
  * Declared here so ZSTREAMER_FILTER_CONFIG_INIT can reference it.

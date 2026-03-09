@@ -5,4 +5,4 @@ zephyr_library()
 
 zephyr_include_directories(${ZEPHYR_ZSTREAMER_MODULE_DIR}/include)
 
-zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_ADC_SRC adc_src.c)
+zephyr_library_sources_ifdef(CONFIG_ZSTREAMER_DAC_SINK dac_sink.c)

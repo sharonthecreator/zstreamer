@@ -62,7 +62,7 @@ static const struct zstreamer_node_driver_api count_sink_api = {
   };                                                                           \
   static const struct zstreamer_sink_config count_sink_config_##inst =         \
       ZSTREAMER_SINK_CONFIG_INIT(inst);                                        \
-  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,                \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_sink_common_init, NULL,                \
                         &count_sink_data_##inst, &count_sink_config_##inst,    \
                         POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
                         &count_sink_api);
