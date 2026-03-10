@@ -41,7 +41,7 @@ struct adc_src_data {
 
 static int adc_src_process(const struct device *dev, struct net_buf *buf) {
   const struct adc_src_config *cfg = dev->config;
-  /* Output sample width: 1 byte for <=8-bit, 2 bytes otherwise. */
+  /* Output sample width: 1 byte for <= 8-bit, 2 bytes otherwise. */
   size_t sample_bytes = (cfg->channels[0].resolution <= 8) ? 1 : 2;
   size_t frame_size = cfg->num_channels * sample_bytes;
   uint8_t *out = net_buf_add(buf, frame_size * cfg->samples);
@@ -49,13 +49,13 @@ static int adc_src_process(const struct device *dev, struct net_buf *buf) {
   for (uint16_t s = 0; s < cfg->samples; s++) {
     for (uint8_t ch = 0; ch < cfg->num_channels; ch++) {
       const struct adc_dt_spec *spec = &cfg->channels[ch];
-      /* Zephyr ADC API always writes uint16_t values. */
-      uint16_t adc_val;
+      /* ADC API always writes uint16_t values. */
+      uint16_t adc_value = 0;
 
       struct adc_sequence seq = {
           .channels = BIT(spec->channel_id),
-          .buffer = &adc_val,
-          .buffer_size = sizeof(adc_val),
+          .buffer = &adc_value,
+          .buffer_size = sizeof(adc_value),
           .resolution = spec->resolution,
           .oversampling = spec->oversampling,
       };
@@ -67,7 +67,7 @@ static int adc_src_process(const struct device *dev, struct net_buf *buf) {
       }
 
       size_t offset = (s * cfg->num_channels + ch) * sample_bytes;
-      memcpy(out + offset, &adc_val, sample_bytes);
+      memcpy(out + offset, &adc_value, sample_bytes);
     }
   }
 
@@ -116,7 +116,7 @@ static const struct zstreamer_node_driver_api adc_src_api = {
 
 /* Resolve the first io-channel's DT node to read zephyr,resolution. */
 #define ADC_SRC_FIRST_CH_NODE(inst)                                            \
-  ADC_CHANNEL_DT_NODE(DT_IO_CHANNELS_CTLR_BY_IDX(DT_DRV_INST(inst), 0),      \
+  ADC_CHANNEL_DT_NODE(DT_IO_CHANNELS_CTLR_BY_IDX(DT_DRV_INST(inst), 0),        \
                       DT_IO_CHANNELS_INPUT_BY_IDX(DT_DRV_INST(inst), 0))
 
 #define ADC_SRC_SAMPLE_BYTES(inst)                                             \

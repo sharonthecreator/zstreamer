@@ -31,7 +31,7 @@ extern "C" {
 
 struct zstreamer_sink_config {
   struct zstreamer_node_config common;
-  /* No children — sinks are terminal. */
+  /* No children — sinks are terminal, children will be NULLed. */
 };
 
 struct zstreamer_sink_data {
@@ -71,11 +71,8 @@ extern void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3);
 #define ZSTREAMER_SINK_CONFIG_INIT(inst)                                       \
   {                                                                            \
     .common = {                                                                \
-      Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(DT_DRV_INST(inst),                     \
-                                        DT_INST_PROP(inst, thread_stack_size), \
-                                        DT_INST_PROP(inst, thread_priority),   \
-                                        NULL, 0, zstreamer_sink_thread_entry), \
-      .readonly = true,                                                        \
+      Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, NULL, 0,                         \
+                                        zstreamer_sink_thread_entry, true),    \
     }                                                                          \
   }
 
@@ -105,21 +102,11 @@ extern void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3);
  * Sinks have no children array.  Must be called BEFORE defining the
  * driver's data/config structs so the stack symbol is visible.
  *
- * @param inst     Devicetree instance number.
- * @param node_id  Devicetree node identifier.
- */
-#define ZSTREAMER_SINK_DT_PRE_DEFINE(inst, node_id)                            \
-  static K_THREAD_STACK_DEFINE(zstreamer_sink_stack_##inst,                    \
-                               DT_PROP(node_id, thread_stack_size))
-
-/**
- * @brief Convenience wrapper for ZSTREAMER_SINK_DT_PRE_DEFINE using
- *        DT_DRV_INST.
- *
  * @param inst  Devicetree instance number.
  */
 #define ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst)                                \
-  ZSTREAMER_SINK_DT_PRE_DEFINE(inst, DT_DRV_INST(inst))
+  static K_THREAD_STACK_DEFINE(zstreamer_sink_stack_##inst,                    \
+                               ZSTREAMER_THREAD_STACK_SIZE)
 
 /**
  * @}

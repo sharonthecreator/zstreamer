@@ -26,17 +26,17 @@
 /* DTS nodes                                                           */
 /* ------------------------------------------------------------------ */
 
-#define GRAPH_NODE         DT_NODELABEL(adc_streaming_graph)
-#define ADC_SRC_NODE       DT_NODELABEL(adc_source)
-#define ADC_SRC_8BIT_NODE  DT_NODELABEL(adc_source_8bit)
-#define COUNT_NODE         DT_NODELABEL(counter)
-#define ADC_EMUL_NODE      DT_NODELABEL(adc_emul)
+#define GRAPH_NODE DT_NODELABEL(adc_streaming_graph)
+#define ADC_SRC_NODE DT_NODELABEL(adc_source)
+#define ADC_SRC_8BIT_NODE DT_NODELABEL(adc_source_8bit)
+#define COUNT_NODE DT_NODELABEL(counter)
+#define ADC_EMUL_NODE DT_NODELABEL(adc_emul)
 
-static const struct device *graph_dev       = DEVICE_DT_GET(GRAPH_NODE);
-static const struct device *adc_src_dev     = DEVICE_DT_GET(ADC_SRC_NODE);
+static const struct device *graph_dev = DEVICE_DT_GET(GRAPH_NODE);
+static const struct device *adc_src_dev = DEVICE_DT_GET(ADC_SRC_NODE);
 static const struct device *adc_src_8bit_dev = DEVICE_DT_GET(ADC_SRC_8BIT_NODE);
-static const struct device *count_dev       = DEVICE_DT_GET(COUNT_NODE);
-static const struct device *adc_emul_dev    = DEVICE_DT_GET(ADC_EMUL_NODE);
+static const struct device *count_dev = DEVICE_DT_GET(COUNT_NODE);
+static const struct device *adc_emul_dev = DEVICE_DT_GET(ADC_EMUL_NODE);
 
 /* ------------------------------------------------------------------ */
 /* Fixture                                                             */
@@ -139,8 +139,8 @@ ZTEST(zstreamer_adc, test_src_16bit_frame_size) {
   /* 16 samples × 1 channel × 2 bytes = 32 bytes per buffer. */
   uint32_t expected_frame = 16 * 1 * sizeof(uint16_t);
 
-  zassert_equal(bytes / bufs, expected_frame,
-                "frame size %u != expected %u", bytes / bufs, expected_frame);
+  zassert_equal(bytes / bufs, expected_frame, "frame size %u != expected %u",
+                bytes / bufs, expected_frame);
   zassert_equal(bytes % expected_frame, 0,
                 "total bytes %u not a multiple of frame size %u", bytes,
                 expected_frame);
@@ -218,8 +218,8 @@ ZTEST(zstreamer_adc, test_src_8bit_frame_size) {
   /* 16 samples × 1 channel × 1 byte = 16 bytes per buffer. */
   uint32_t expected_frame = 16 * 1 * sizeof(uint8_t);
 
-  zassert_equal(bytes / bufs, expected_frame,
-                "frame size %u != expected %u", bytes / bufs, expected_frame);
+  zassert_equal(bytes / bufs, expected_frame, "frame size %u != expected %u",
+                bytes / bufs, expected_frame);
   zassert_equal(bytes % expected_frame, 0,
                 "total bytes %u not a multiple of frame size %u", bytes,
                 expected_frame);

@@ -16,12 +16,7 @@ LOG_MODULE_REGISTER(lora_sink, CONFIG_ZSTREAMER_LOG_LEVEL);
 struct lora_sink_config {
   struct zstreamer_sink_config common;
   const struct device *lora_dev;
-  uint32_t frequency;
-  enum lora_signal_bandwidth bandwidth;
-  enum lora_datarate spreading_factor;
-  enum lora_coding_rate coding_rate;
-  uint16_t preamble_len;
-  int8_t tx_power;
+  struct lora_modem_config modem_cfg;
 };
 
 struct lora_sink_data {
@@ -42,19 +37,8 @@ static int lora_sink_configure(const struct device *dev) {
     return -ENODEV;
   }
 
-  struct lora_modem_config modem_cfg = {
-      .frequency = cfg->frequency,
-      .bandwidth = cfg->bandwidth,
-      .datarate = cfg->spreading_factor,
-      .coding_rate = cfg->coding_rate,
-      .preamble_len = cfg->preamble_len,
-      .tx_power = cfg->tx_power,
-      .tx = true,
-      .iq_inverted = false,
-      .public_network = false,
-  };
-
-  int ret = lora_config(cfg->lora_dev, &modem_cfg);
+  int ret =
+      lora_config(cfg->lora_dev, (struct lora_modem_config *)&cfg->modem_cfg);
 
   if (ret < 0) {
     LOG_ERR("lora_config failed: %d", ret);
@@ -62,8 +46,8 @@ static int lora_sink_configure(const struct device *dev) {
   }
 
   LOG_INF("LoRa sink %s: %u Hz, SF%u, BW%u, TX %d dBm", dev->name,
-          cfg->frequency, cfg->spreading_factor, cfg->bandwidth,
-          cfg->tx_power);
+          cfg->modem_cfg.frequency, cfg->modem_cfg.datarate,
+          cfg->modem_cfg.bandwidth, cfg->modem_cfg.tx_power);
 
   data->configured = true;
   return 0;
@@ -103,15 +87,19 @@ static const struct zstreamer_node_driver_api lora_sink_api = {
   static const struct lora_sink_config lora_sink_config_##inst = {             \
       .common = ZSTREAMER_SINK_CONFIG_INIT(inst),                              \
       .lora_dev = DEVICE_DT_GET(DT_INST_PHANDLE(inst, lora_device)),           \
-      .frequency = DT_INST_PROP(inst, frequency),                              \
-      .bandwidth = DT_INST_PROP(inst, bandwidth),                              \
-      .spreading_factor = DT_INST_PROP(inst, spreading_factor),                \
-      .coding_rate = DT_INST_PROP(inst, coding_rate),                          \
-      .preamble_len = DT_INST_PROP(inst, preamble_length),                     \
-      .tx_power = DT_INST_PROP(inst, tx_power),                                \
+      .modem_cfg =                                                             \
+          {                                                                    \
+              .frequency = DT_INST_PROP(inst, frequency),                      \
+              .bandwidth = DT_INST_PROP(inst, bandwidth),                      \
+              .datarate = DT_INST_PROP(inst, spreading_factor),                \
+              .coding_rate = DT_INST_PROP(inst, coding_rate),                  \
+              .preamble_len = DT_INST_PROP(inst, preamble_length),             \
+              .tx_power = DT_INST_PROP(inst, tx_power),                        \
+              .tx = true,                                                      \
+          },                                                                   \
   };                                                                           \
   DEVICE_DT_INST_DEFINE(inst, zstreamer_sink_common_init, NULL,                \
-                        &lora_sink_data_##inst, &lora_sink_config_##inst,       \
+                        &lora_sink_data_##inst, &lora_sink_config_##inst,      \
                         POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \
                         &lora_sink_api);
 

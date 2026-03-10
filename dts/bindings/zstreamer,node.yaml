@@ -12,11 +12,6 @@ compatible: "zstreamer,node"
 include: base.yaml
 
 properties:
-  thread-stack-size:
-    type: int
-    default: 1024
-    description: Stack size in bytes for the node thread.
-
   thread-priority:
     type: int
     default: 5

@@ -14,6 +14,11 @@
 		status = "okay";
 	};
 
+	fake_dac_multi: fake-dac-multi {
+		compatible = "zstreamer,fake-dac";
+		status = "okay";
+	};
+
 	dac_streaming_graph: dac-streaming-graph {
 		compatible = "zstreamer,graph";
 		buffer-count = <8>;
@@ -25,20 +30,34 @@
 			children = <&dac_sinker>, <&dac_sinker_8bit>;
 		};
 
-		/* 12-bit sink */
+		numgen_multi: numgen-source-multi {
+			compatible = "zstreamer,numgen-src";
+			sleep-ms = <1>;
+			children = <&dac_sinker_multi>;
+		};
+
+		/* 12-bit sink, single channel */
 		dac_sinker: dac-sinker {
 			compatible = "zstreamer,dac-sink";
 			dac-device = <&fake_dac>;
-			dac-channel-id = <0>;
+			dac-channel-ids = <0>;
 			dac-resolution = <12>;
 		};
 
-		/* 8-bit sink */
+		/* 8-bit sink, single channel */
 		dac_sinker_8bit: dac-sinker-8bit {
 			compatible = "zstreamer,dac-sink";
 			dac-device = <&fake_dac_8bit>;
-			dac-channel-id = <0>;
+			dac-channel-ids = <0>;
 			dac-resolution = <8>;
+		};
+
+		/* 12-bit sink, two channels (stereo) */
+		dac_sinker_multi: dac-sinker-multi {
+			compatible = "zstreamer,dac-sink";
+			dac-device = <&fake_dac_multi>;
+			dac-channel-ids = <0 1>;
+			dac-resolution = <12>;
 		};
 	};
 };

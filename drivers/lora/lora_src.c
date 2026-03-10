@@ -16,20 +16,18 @@
 
 LOG_MODULE_REGISTER(lora_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 
+#define MAX_LORA_RECV_SIZE 255
+
 struct lora_src_config {
   struct zstreamer_source_config common;
   const struct device *lora_dev;
-  uint32_t frequency;
-  enum lora_signal_bandwidth bandwidth;
-  enum lora_datarate spreading_factor;
-  enum lora_coding_rate coding_rate;
-  uint16_t preamble_len;
-  int8_t tx_power;
+  struct lora_modem_config modem_cfg;
 };
 
 struct lora_src_data {
   struct zstreamer_source_data common;
   bool configured;
+  uint8_t rx_buf[MAX_LORA_RECV_SIZE];
 };
 
 static int lora_src_configure(const struct device *dev) {
@@ -45,27 +43,17 @@ static int lora_src_configure(const struct device *dev) {
     return -ENODEV;
   }
 
-  struct lora_modem_config modem_cfg = {
-      .frequency = cfg->frequency,
-      .bandwidth = cfg->bandwidth,
-      .datarate = cfg->spreading_factor,
-      .coding_rate = cfg->coding_rate,
-      .preamble_len = cfg->preamble_len,
-      .tx_power = cfg->tx_power,
-      .tx = false,
-      .iq_inverted = false,
-      .public_network = false,
-  };
-
-  int ret = lora_config(cfg->lora_dev, &modem_cfg);
+  int ret =
+      lora_config(cfg->lora_dev, (struct lora_modem_config *)&cfg->modem_cfg);
 
   if (ret < 0) {
     LOG_ERR("lora_config failed: %d", ret);
     return ret;
   }
 
-  LOG_INF("LoRa source %s: %u Hz, SF%u, BW%u", dev->name, cfg->frequency,
-          cfg->spreading_factor, cfg->bandwidth);
+  LOG_INF("LoRa source %s: %u Hz, SF%u, BW%u", dev->name,
+          cfg->modem_cfg.frequency, cfg->modem_cfg.datarate,
+          cfg->modem_cfg.bandwidth);
 
   data->configured = true;
   return 0;
@@ -82,16 +70,11 @@ static int lora_src_process(const struct device *dev, struct net_buf *buf) {
     return ret;
   }
 
-  size_t room = net_buf_tailroom(buf);
+  struct lora_src_data *data = dev->data;
+  uint8_t max_len = MIN(net_buf_tailroom(buf), MAX_LORA_RECV_SIZE);
 
-  /*
-   * Temporary stack buffer -- lora_recv needs a contiguous buffer and we
-   * copy into the net_buf afterwards.  LoRa payloads are at most 255 bytes.
-   */
-  uint8_t rx_buf[255];
-  uint8_t max_len = (room < sizeof(rx_buf)) ? (uint8_t)room : sizeof(rx_buf);
-
-  int len = lora_recv(cfg->lora_dev, rx_buf, max_len, K_FOREVER, &rssi, &snr);
+  int len =
+      lora_recv(cfg->lora_dev, data->rx_buf, max_len, K_FOREVER, &rssi, &snr);
 
   if (len < 0) {
     LOG_ERR("lora_recv failed: %d", len);
@@ -99,7 +82,7 @@ static int lora_src_process(const struct device *dev, struct net_buf *buf) {
   }
 
   if (len > 0) {
-    memcpy(net_buf_add(buf, len), rx_buf, len);
+    memcpy(net_buf_add(buf, len), data->rx_buf, len);
     LOG_DBG("RX %d bytes, RSSI %d dBm, SNR %d dB", len, rssi, snr);
   }
 
@@ -118,12 +101,16 @@ static const struct zstreamer_node_driver_api lora_src_api = {
   static const struct lora_src_config lora_src_config_##inst = {               \
       .common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),                            \
       .lora_dev = DEVICE_DT_GET(DT_INST_PHANDLE(inst, lora_device)),           \
-      .frequency = DT_INST_PROP(inst, frequency),                              \
-      .bandwidth = DT_INST_PROP(inst, bandwidth),                              \
-      .spreading_factor = DT_INST_PROP(inst, spreading_factor),                \
-      .coding_rate = DT_INST_PROP(inst, coding_rate),                          \
-      .preamble_len = DT_INST_PROP(inst, preamble_length),                     \
-      .tx_power = DT_INST_PROP(inst, tx_power),                                \
+      .modem_cfg =                                                             \
+          {                                                                    \
+              .frequency = DT_INST_PROP(inst, frequency),                      \
+              .bandwidth = DT_INST_PROP(inst, bandwidth),                      \
+              .datarate = DT_INST_PROP(inst, spreading_factor),                \
+              .coding_rate = DT_INST_PROP(inst, coding_rate),                  \
+              .preamble_len = DT_INST_PROP(inst, preamble_length),             \
+              .tx_power = DT_INST_PROP(inst, tx_power),                        \
+              .tx = false,                                                     \
+          },                                                                   \
   };                                                                           \
   DEVICE_DT_INST_DEFINE(inst, zstreamer_source_common_init, NULL,              \
                         &lora_src_data_##inst, &lora_src_config_##inst,        \

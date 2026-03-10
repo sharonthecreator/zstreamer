@@ -7,6 +7,8 @@
  * Pipeline: numgen-src → dac-sinker (12-bit) + dac-sinker-8bit (8-bit)
  * Both sinks receive every buffer from numgen; each writes to its own
  * fake DAC so recordings don't interleave.
+ *
+ * Multi-channel pipeline: numgen-multi → dac-sinker-multi (2ch, 12-bit)
  */
 
 #include <string.h>
@@ -25,19 +27,29 @@
 /* DTS nodes                                                           */
 /* ------------------------------------------------------------------ */
 
-#define GRAPH_NODE          DT_NODELABEL(dac_streaming_graph)
-#define NUMGEN_NODE         DT_NODELABEL(numgen)
-#define DAC_SINK_NODE       DT_NODELABEL(dac_sinker)
-#define DAC_SINK_8BIT_NODE  DT_NODELABEL(dac_sinker_8bit)
-#define FAKE_DAC_NODE       DT_NODELABEL(fake_dac)
-#define FAKE_DAC_8BIT_NODE  DT_NODELABEL(fake_dac_8bit)
+#define GRAPH_NODE DT_NODELABEL(dac_streaming_graph)
+#define NUMGEN_NODE DT_NODELABEL(numgen)
+#define NUMGEN_MULTI_NODE DT_NODELABEL(numgen_multi)
+#define DAC_SINK_NODE DT_NODELABEL(dac_sinker)
+#define DAC_SINK_8BIT_NODE DT_NODELABEL(dac_sinker_8bit)
+#define DAC_SINK_MULTI_NODE DT_NODELABEL(dac_sinker_multi)
+#define FAKE_DAC_NODE DT_NODELABEL(fake_dac)
+#define FAKE_DAC_8BIT_NODE DT_NODELABEL(fake_dac_8bit)
+#define FAKE_DAC_MULTI_NODE DT_NODELABEL(fake_dac_multi)
 
-static const struct device *graph_dev        = DEVICE_DT_GET(GRAPH_NODE);
-static const struct device *numgen_dev       = DEVICE_DT_GET(NUMGEN_NODE);
-static const struct device *dac_sink_dev     = DEVICE_DT_GET(DAC_SINK_NODE);
-static const struct device *dac_sink_8bit_dev = DEVICE_DT_GET(DAC_SINK_8BIT_NODE);
-static const struct device *fake_dac_dev     = DEVICE_DT_GET(FAKE_DAC_NODE);
-static const struct device *fake_dac_8bit_dev = DEVICE_DT_GET(FAKE_DAC_8BIT_NODE);
+static const struct device *graph_dev = DEVICE_DT_GET(GRAPH_NODE);
+static const struct device *numgen_dev = DEVICE_DT_GET(NUMGEN_NODE);
+static const struct device *numgen_multi_dev = DEVICE_DT_GET(NUMGEN_MULTI_NODE);
+static const struct device *dac_sink_dev = DEVICE_DT_GET(DAC_SINK_NODE);
+static const struct device *dac_sink_8bit_dev =
+    DEVICE_DT_GET(DAC_SINK_8BIT_NODE);
+static const struct device *dac_sink_multi_dev =
+    DEVICE_DT_GET(DAC_SINK_MULTI_NODE);
+static const struct device *fake_dac_dev = DEVICE_DT_GET(FAKE_DAC_NODE);
+static const struct device *fake_dac_8bit_dev =
+    DEVICE_DT_GET(FAKE_DAC_8BIT_NODE);
+static const struct device *fake_dac_multi_dev =
+    DEVICE_DT_GET(FAKE_DAC_MULTI_NODE);
 
 /* ------------------------------------------------------------------ */
 /* Fixture                                                             */
@@ -47,9 +59,11 @@ static void cleanup(void *fixture) {
   ARG_UNUSED(fixture);
 
   zstreamer_source_stop(numgen_dev);
+  zstreamer_source_stop(numgen_multi_dev);
   k_msleep(50);
   fake_dac_reset(fake_dac_dev);
   fake_dac_reset(fake_dac_8bit_dev);
+  fake_dac_reset(fake_dac_multi_dev);
 }
 
 ZTEST_SUITE(zstreamer_dac, NULL, NULL, cleanup, cleanup, NULL);
@@ -61,10 +75,13 @@ ZTEST_SUITE(zstreamer_dac, NULL, NULL, cleanup, cleanup, NULL);
 ZTEST(zstreamer_dac, test_devices_ready) {
   zassert_true(device_is_ready(graph_dev), "graph not ready");
   zassert_true(device_is_ready(numgen_dev), "numgen not ready");
+  zassert_true(device_is_ready(numgen_multi_dev), "numgen_multi not ready");
   zassert_true(device_is_ready(dac_sink_dev), "dac_sink not ready");
   zassert_true(device_is_ready(dac_sink_8bit_dev), "dac_sink_8bit not ready");
+  zassert_true(device_is_ready(dac_sink_multi_dev), "dac_sink_multi not ready");
   zassert_true(device_is_ready(fake_dac_dev), "fake_dac not ready");
   zassert_true(device_is_ready(fake_dac_8bit_dev), "fake_dac_8bit not ready");
+  zassert_true(device_is_ready(fake_dac_multi_dev), "fake_dac_multi not ready");
 }
 
 ZTEST(zstreamer_dac, test_start_stop) {
@@ -296,9 +313,83 @@ ZTEST(zstreamer_dac, test_8bit_more_samples_than_16bit) {
    * 1 byte per sample, the 16-bit sink processes 2 bytes per sample.
    * So the 8-bit sink should produce ~2x more DAC writes.
    */
-  zassert_true(w_8 > w_16,
-               "8-bit writes (%u) should exceed 16-bit writes (%u)", w_8,
-               w_16);
+  zassert_true(w_8 > w_16, "8-bit writes (%u) should exceed 16-bit writes (%u)",
+               w_8, w_16);
+}
+
+/* ------------------------------------------------------------------ */
+/* Multi-channel tests                                                 */
+/* ------------------------------------------------------------------ */
+
+ZTEST(zstreamer_dac, test_multi_channel_dac_called) {
+  int ret;
+
+  ret = zstreamer_source_start(numgen_multi_dev);
+  zassert_equal(ret, 0);
+
+  k_msleep(200);
+
+  ret = zstreamer_source_stop(numgen_multi_dev);
+  zassert_equal(ret, 0);
+
+  k_msleep(50);
+
+  zassert_true(fake_dac_get_write_count(fake_dac_multi_dev) > 0,
+               "multi-channel DAC write_value was never called");
+}
+
+ZTEST(zstreamer_dac, test_multi_channel_alternates) {
+  int ret;
+
+  ret = zstreamer_source_start(numgen_multi_dev);
+  zassert_equal(ret, 0);
+
+  k_msleep(100);
+
+  ret = zstreamer_source_stop(numgen_multi_dev);
+  zassert_equal(ret, 0);
+
+  k_msleep(50);
+
+  uint32_t n = fake_dac_get_recorded_count(fake_dac_multi_dev);
+
+  zassert_true(n >= 4, "need at least 4 values for 2-ch test, got %u", n);
+
+  /*
+   * With 2 channels, writes should alternate: ch0, ch1, ch0, ch1, ...
+   */
+  for (uint32_t i = 0; i < n; i++) {
+    uint8_t expected_ch = (i % 2 == 0) ? 0 : 1;
+    uint8_t actual_ch = fake_dac_get_recorded_channel(fake_dac_multi_dev, i);
+
+    zassert_equal(actual_ch, expected_ch, "write %u: channel %u != expected %u",
+                  i, actual_ch, expected_ch);
+  }
+}
+
+ZTEST(zstreamer_dac, test_multi_channel_values_in_range) {
+  int ret;
+
+  ret = zstreamer_source_start(numgen_multi_dev);
+  zassert_equal(ret, 0);
+
+  k_msleep(200);
+
+  ret = zstreamer_source_stop(numgen_multi_dev);
+  zassert_equal(ret, 0);
+
+  k_msleep(50);
+
+  uint32_t n = fake_dac_get_recorded_count(fake_dac_multi_dev);
+
+  zassert_true(n > 0, "no multi-channel values recorded");
+
+  for (uint32_t i = 0; i < n; i++) {
+    uint32_t val = fake_dac_get_recorded_value(fake_dac_multi_dev, i);
+
+    zassert_true(val <= 4095, "sample %u: value %u out of 12-bit range", i,
+                 val);
+  }
 }
 
 /* ------------------------------------------------------------------ */

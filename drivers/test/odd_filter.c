@@ -31,7 +31,7 @@ static const struct zstreamer_node_driver_api odd_filter_api = {
   static struct zstreamer_filter_data odd_filter_data_##inst =                 \
       ZSTREAMER_FILTER_DATA_INIT(inst);                                        \
   static const struct zstreamer_filter_config odd_filter_config_##inst =       \
-      ZSTREAMER_FILTER_CONFIG_INIT(inst);                                      \
+      ZSTREAMER_FILTER_CONFIG_INIT(inst, true);                                \
   DEVICE_DT_INST_DEFINE(inst, zstreamer_filter_common_init, NULL,              \
                         &odd_filter_data_##inst, &odd_filter_config_##inst,    \
                         POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,       \

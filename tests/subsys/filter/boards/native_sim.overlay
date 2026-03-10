@@ -12,7 +12,6 @@
 		numgen_source: numgen-source {
 			compatible = "zstreamer,numgen-src";
 			children = <&odd_filter>;
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 		};
 
@@ -20,19 +19,16 @@
 			compatible = "zstreamer,odd-filter";
 			children = <&true_sinker>;
 			false-children = <&false_sinker>;
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 		};
 
 		true_sinker: true-sinker {
 			compatible = "zstreamer,count-sink";
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 		};
 
 		false_sinker: false-sinker {
 			compatible = "zstreamer,count-sink";
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 		};
 	};

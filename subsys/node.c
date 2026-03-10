@@ -102,7 +102,7 @@ int zstreamer_node_common_init(const struct device *dev) {
   data->dev = dev;
   k_fifo_init(&data->fifo);
 
-  k_thread_create(&data->thread, data->stack, cfg->thread_stack_size,
+  k_thread_create(&data->thread, data->stack, ZSTREAMER_THREAD_STACK_SIZE,
                   cfg->thread_entry, (void *)dev, NULL, NULL,
                   cfg->thread_priority, 0, K_NO_WAIT);
 

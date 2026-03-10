@@ -1,7 +1,9 @@
 # ZStreamer
 
-A streaming pipeline framework for [Zephyr RTOS](https://zephyrproject.org/), inspired by [GStreamer](https://gstreamer.freedesktop.org/).
-Define data pipelines entirely in devicetree — wire nodes with phandles, and data flows automatically through shared `net_buf` pools. No application code required.
+A streaming pipeline framework for [Zephyr RTOS](https://zephyrproject.org/),
+inspired by [GStreamer](https://gstreamer.freedesktop.org/).
+Define data pipelines entirely in devicetree — wire nodes with phandles,
+and data flows automatically through shared `net_buf` pools. No application code required.
 
 ## How it works
 
@@ -13,7 +15,16 @@ graph LR
     FILT -->|"false"| SINK2[Sink B]
 ```
 
-Every node is a Zephyr device with its own **thread** and **k_fifo** input queue. A `streaming-graph` container owns a single `net_buf_pool` shared by all its nodes. Sources allocate buffers from the pool, fill them via a `process` callback, and distribute to children by putting refs into their FIFOs. Each downstream thread blocks on its FIFO, processes the buffer, and either forwards to its own children or unrefs it (sinks). Distribution uses copy-on-write: readonly children share a `net_buf_ref`, readwrite children get a `net_buf_clone`. When the last consumer unrefs, the buffer returns to the pool.
+Every node is a Zephyr device with its own **thread** and **k_fifo** input queue.
+A `streaming-graph` container owns a single `net_buf_pool` shared by all its nodes.
+
+**Data flow:** Sources allocate buffers from the pool, fill them via a `process` callback,
+and push refs into their children's FIFOs. Each downstream thread blocks on its FIFO,
+processes the buffer, and either forwards to its own children or unrefs it (sinks).
+
+**Copy-on-write distribution:** Readonly children share a `net_buf_ref`;
+readwrite children get a `net_buf_clone`. When the last consumer unrefs,
+the buffer returns to the pool.
 
 **Four node types:**
 
@@ -30,35 +41,25 @@ Every node is a Zephyr device with its own **thread** and **k_fifo** input queue
 / {
     streaming-graph {
         compatible = "zstreamer,graph";
-        pool-count = <16>;
-        pool-size = <128>;
+        buffer-count = <8>;
+        buffer-size = <1>;
 
-        spi_source: spi-source {
-            compatible = "zstreamer,spi-src";
-            spi-dev = <&spi1>;
+        sine_source: sine-source {
+            compatible = "zstreamer,sine-src";
+            cycle-ms = <4000>;
+            children = <&pwm_sink>;
             autostart;
-            children = <&spi_sink>;
         };
 
-        spi_sink: spi-sink {
-            compatible = "zstreamer,spi-sink";
-            spi-dev = <&spi2>;
+        pwm_sink: pwm-sink {
+            compatible = "zstreamer,pwm-sink";
+            pwms = <&pwm2 2 PWM_MSEC(1) PWM_POLARITY_NORMAL>;
         };
     };
 };
 ```
 
-That's it. SPI data flows from `spi1` to `spi2` at boot. No C code needed.
-
-## Included drivers
-
-| Driver | Type | Compatible |
-|--------|------|-----------|
-| UART source/sink | Source, Sink | `zstreamer,uart-src` / `zstreamer,uart-sink` |
-| SPI source/sink | Source, Sink | `zstreamer,spi-src` / `zstreamer,spi-sink` |
-| ADC source | Source | `zstreamer,adc-src` |
-| FS sink | Sink | `zstreamer,fs-sink` |
-| PWM sink | Sink | `zstreamer,pwm-sink` |
+That's it. A 4-second sine wave drives a PWM LED at boot. No C code needed.
 
 ## Writing a driver
 
@@ -83,7 +84,7 @@ static const struct zstreamer_node_driver_api my_sink_api = {
       ZSTREAMER_SINK_DATA_INIT(inst);                                \
   static const struct zstreamer_sink_config my_sink_config_##inst =   \
       ZSTREAMER_SINK_CONFIG_INIT(inst);                              \
-  DEVICE_DT_INST_DEFINE(inst, zstreamer_node_common_init, NULL,       \
+  DEVICE_DT_INST_DEFINE(inst, zstreamer_sink_common_init, NULL,       \
                         &my_sink_data_##inst, &my_sink_config_##inst,  \
                         POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, \
                         &my_sink_api);
@@ -91,21 +92,12 @@ static const struct zstreamer_node_driver_api my_sink_api = {
 DT_INST_FOREACH_STATUS_OKAY(MY_SINK_DEFINE)
 ```
 
-Key rules:
+**Key rules:**
 - Call `PRE_DEFINE(inst)` **before** data/config structs
-- Source drivers use `zstreamer_source_common_init` (not `zstreamer_node_common_init`)
+- Each node type has its own `common_init`: sources use `zstreamer_source_common_init`, sinks use `zstreamer_sink_common_init`, filters use `zstreamer_filter_common_init`
 - Sources support `autostart` DTS property for boot-time start
 - For custom init, call `common_init` last (it starts the node thread)
-
-## Samples
-
-| Sample | Pipeline |
-|--------|----------|
-| `uart2uart` | UART RX -> UART TX |
-| `spi2spi` | SPI RX -> SPI TX |
-| `adc2fakesink` | ADC capture -> log output |
-| `sine2pwm` | Sine wave -> PWM (LED) duty cycle |
-| `numgen2fakesink` | Number generator -> log output |
+- Thread stack is **fixed** at 2048 bytes — large data belongs in the `net_buf` or the driver's data struct, not on the stack
 
 ## Building & testing
 
@@ -123,12 +115,22 @@ west build -b nucleo_u575zi_q samples/uart2uart
 
 ## Roadmap
 
+### Subsystem
+
+- [ ] **Buffer metadata** — standardized metadata header on `net_buf` (timestamps, sequence numbers, sample rate)
+- [ ] **Buffer typing** — typed buffers (audio, raw, encoded, …) with type-negotiation between nodes, allowing drivers to register per-type `process` callbacks (preferably at compile-time)
+- [ ] **Runtime settings** — configure driver parameters (e.g. LoRa frequency, ADC sample rate) at runtime via Zephyr's `settings` subsystem, persisted across reboots
+- [ ] **Pipeline analyzer** — thread stack usage, buffer pool utilization, per-node throughput counters, and shell commands for live pipeline inspection
+
+### Drivers
+
 - [x] **UART source/sink** — serial data streaming
 - [x] **SPI source/sink** — SPI bus data relay
 - [x] **ADC source** — analog-to-digital capture
 - [x] **FS sink** — write pipeline data to filesystem
 - [x] **PWM sink** — drive PWM duty cycle from pipeline data
 - [x] **DAC sink** — analog output (`sine_src -> dac_sink` = function generator)
+- [x] **LoRa source/sink** — wireless data over LoRa radio
 - [ ] **I2S source/sink** — audio streaming (mic-to-speaker, recording, DSP)
 - [ ] **BLE GATT sink/source** — wireless data over BLE notifications
 - [ ] **Sensor source** — wraps Zephyr sensor API (works with hundreds of existing drivers)

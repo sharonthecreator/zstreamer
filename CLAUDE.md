@@ -50,6 +50,7 @@ timeout 120s ./build/test-<name>/zephyr/zephyr.exe
 ## Design Rules
 
 - Start/stop contract: first `start()` → 0, second → `-EALREADY`; same for `stop()`
+- Thread stack size is fixed at `ZSTREAMER_THREAD_STACK_SIZE` (2048) in `node.h`. Do NOT increase it — if a driver needs extra memory, allocate it in the driver's data struct, not on the stack.
 - Use public `net_buf` APIs only
 - native_sim: simulated time advances only when ALL threads blocked — use `k_sleep`/`k_yield` in loops
 - SPI emulator: sync `transceive` only on native_sim

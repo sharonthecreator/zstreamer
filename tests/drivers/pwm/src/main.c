@@ -52,8 +52,7 @@ static uint32_t recorded_periods[MAX_RECORDED];
 static uint32_t recorded_count;
 
 static int recording_fake(const struct device *dev, uint32_t ch,
-                          uint32_t period, uint32_t pulse,
-                          pwm_flags_t flags) {
+                          uint32_t period, uint32_t pulse, pwm_flags_t flags) {
   ARG_UNUSED(dev);
   ARG_UNUSED(ch);
   ARG_UNUSED(flags);
@@ -223,8 +222,7 @@ ZTEST(zstreamer_node_pwm, test_reaches_trough) {
 
   uint32_t min_pct = min_pulse * 100 / EXPECTED_PERIOD_CYCLES;
 
-  zassert_true(min_pct <= 5, "trough duty %u%% (pulse=%u)", min_pct,
-               min_pulse);
+  zassert_true(min_pct <= 5, "trough duty %u%% (pulse=%u)", min_pct, min_pulse);
 }
 
 ZTEST(zstreamer_node_pwm, test_duty_range) {
@@ -258,9 +256,8 @@ ZTEST(zstreamer_node_pwm, test_duty_range) {
   uint32_t range = max_pulse - min_pulse;
   uint32_t range_pct = range * 100 / EXPECTED_PERIOD_CYCLES;
 
-  zassert_true(range_pct >= 90,
-               "duty range only %u%% (min=%u max=%u)", range_pct, min_pulse,
-               max_pulse);
+  zassert_true(range_pct >= 90, "duty range only %u%% (min=%u max=%u)",
+               range_pct, min_pulse, max_pulse);
 }
 
 ZTEST(zstreamer_node_pwm, test_sine_oscillation) {

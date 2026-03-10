@@ -4,15 +4,24 @@
 description: |
   DAC sink node for zstreamer pipeline.
 
-  Receives buffers of uint16_t samples and writes each value to a DAC
-  channel using Zephyr's portable DAC API.
+  Receives buffers of interleaved samples and writes each frame to the
+  configured DAC channel(s) using Zephyr's portable DAC API.
 
-  Example with 12-bit DAC on channel 0:
+  Single-channel example (12-bit DAC on channel 0):
 
     dac_sinker: dac-sinker {
         compatible = "zstreamer,dac-sink";
         dac-device = <&dac1>;
-        dac-channel-id = <0>;
+        dac-channel-ids = <0>;
+        dac-resolution = <12>;
+    };
+
+  Multi-channel example (stereo 12-bit DAC):
+
+    dac_sinker: dac-sinker {
+        compatible = "zstreamer,dac-sink";
+        dac-device = <&dac1>;
+        dac-channel-ids = <0 1>;
         dac-resolution = <12>;
     };
 
@@ -26,12 +35,15 @@ properties:
     required: true
     description: DAC device to output samples to.
 
-  dac-channel-id:
-    type: int
-    default: 0
-    description: DAC channel number.
+  dac-channel-ids:
+    type: array
+    required: true
+    description: |
+      DAC channel number(s).  For multi-channel output, samples in
+      the buffer are interleaved across channels (one sample per
+      channel per frame).
 
   dac-resolution:
     type: int
     default: 12
-    description: DAC output resolution in bits.
+    description: DAC output resolution in bits (shared by all channels).

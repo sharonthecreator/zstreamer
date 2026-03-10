@@ -35,6 +35,14 @@ extern "C" {
  */
 
 /**
+ * @brief Fixed thread stack size for all zstreamer node threads.
+ *
+ * Not expected to change.  If a driver needs more memory, allocate
+ * it in the driver's data struct, not on the stack.
+ */
+#define ZSTREAMER_THREAD_STACK_SIZE 2048
+
+/**
  * @brief Base configuration shared by every zstreamer node device.
  *
  * Type-specific config structs embed this as the first member named
@@ -44,7 +52,6 @@ extern "C" {
 struct zstreamer_node_config {
   const struct device *graph;
   k_thread_entry_t thread_entry;
-  size_t thread_stack_size;
   int thread_priority;
   bool readonly;
   const struct device *const *children;
@@ -132,16 +139,15 @@ extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
  * earlier in the same translation unit so that the children array symbol
  * (zstreamer_node_children_##inst) is visible.
  *
- * Usage: .common = ZSTREAMER_NODE_CONFIG_INIT(inst),
+ * Usage: .common = ZSTREAMER_NODE_CONFIG_INIT(inst, true),
  *
- * @param inst  Devicetree instance number.
+ * @param inst      Devicetree instance number.
+ * @param _readonly true if process() never modifies the buffer contents.
  */
-#define ZSTREAMER_NODE_CONFIG_INIT(inst)                                       \
-  {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(                                          \
-      DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),                \
-      DT_INST_PROP(inst, thread_priority), zstreamer_node_children_##inst,     \
-      Z_ZSTREAMER_NUM_CHILDREN(DT_DRV_INST(inst)),                             \
-      zstreamer_node_thread_entry)}
+#define ZSTREAMER_NODE_CONFIG_INIT(inst, _readonly)                            \
+  {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, zstreamer_node_children_##inst,     \
+                                     Z_ZSTREAMER_NUM_CHILDREN(inst),           \
+                                     zstreamer_node_thread_entry, _readonly)}
 
 /**
  * @brief Through-node data initializer.
@@ -170,22 +176,12 @@ extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
  * Must be called BEFORE defining the driver's data/config structs so
  * that these symbols are visible to their initialisers.
  *
- * @param inst     Devicetree instance number.
- * @param node_id  Devicetree node identifier.
- */
-#define ZSTREAMER_NODE_DT_PRE_DEFINE(inst, node_id)                            \
-  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_node, inst, node_id);                  \
-  static K_THREAD_STACK_DEFINE(zstreamer_node_stack_##inst,                    \
-                               DT_PROP(node_id, thread_stack_size))
-
-/**
- * @brief Convenience wrapper for ZSTREAMER_NODE_DT_PRE_DEFINE using
- *        DT_DRV_INST.
- *
  * @param inst  Devicetree instance number.
  */
 #define ZSTREAMER_NODE_DT_INST_PRE_DEFINE(inst)                                \
-  ZSTREAMER_NODE_DT_PRE_DEFINE(inst, DT_DRV_INST(inst))
+  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_node, inst);                           \
+  static K_THREAD_STACK_DEFINE(zstreamer_node_stack_##inst,                    \
+                               ZSTREAMER_THREAD_STACK_SIZE)
 
 /**
  * @}
@@ -196,25 +192,26 @@ extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
 #define Z_ZSTREAMER_NODE_BASE_DATA_INIT(prefix, inst)                          \
   .stack = prefix##_stack_##inst
 
-#define Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(node_id, _stack_size, _prio,         \
-                                          _children, _num_children, _entry)    \
-  .graph = DEVICE_DT_GET(DT_PARENT(node_id)), .thread_entry = _entry,          \
-  .thread_stack_size = _stack_size, .thread_priority = _prio,                  \
-  .readonly = false, .children = _children, .num_children = _num_children
+#define Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, _children, _num_children,      \
+                                          _entry, _readonly)                   \
+  .graph = DEVICE_DT_GET(DT_PARENT(DT_DRV_INST(inst))),                        \
+  .thread_entry = _entry,                                                      \
+  .thread_priority = DT_INST_PROP(inst, thread_priority),                      \
+  .readonly = _readonly, .children = _children, .num_children = _num_children
 
 #define Z_ZSTREAMER_NODE_CHILD_DEV_GET(node_id, prop, idx)                     \
   DEVICE_DT_GET(DT_PHANDLE_BY_IDX(node_id, prop, idx))
 
-#define Z_ZSTREAMER_CHILDREN_DEFINE(prefix, inst, node_id)                     \
+#define Z_ZSTREAMER_CHILDREN_DEFINE(prefix, inst)                              \
   static const struct device *const prefix##_children_##inst[] = {COND_CODE_1( \
-      DT_NODE_HAS_PROP(node_id, children),                                     \
-      (DT_FOREACH_PROP_ELEM_SEP(node_id, children,                             \
+      DT_NODE_HAS_PROP(DT_DRV_INST(inst), children),                           \
+      (DT_FOREACH_PROP_ELEM_SEP(DT_DRV_INST(inst), children,                   \
                                 Z_ZSTREAMER_NODE_CHILD_DEV_GET, (, ))),        \
       ())}
 
-#define Z_ZSTREAMER_NUM_CHILDREN(node_id)                                      \
-  COND_CODE_1(DT_NODE_HAS_PROP(node_id, children),                             \
-              (DT_PROP_LEN(node_id, children)), (0))
+#define Z_ZSTREAMER_NUM_CHILDREN(inst)                                         \
+  COND_CODE_1(DT_NODE_HAS_PROP(DT_DRV_INST(inst), children),                   \
+              (DT_PROP_LEN(DT_DRV_INST(inst), children)), (0))
 
 /** @endcond */
 

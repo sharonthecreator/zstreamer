@@ -29,7 +29,7 @@ static const struct zstreamer_node_driver_api passthrough_node_api = {
   static struct zstreamer_node_data passthrough_node_data_##inst =             \
       ZSTREAMER_NODE_DATA_INIT(inst);                                          \
   static const struct zstreamer_node_config passthrough_node_config_##inst =   \
-      ZSTREAMER_NODE_CONFIG_INIT(inst);                                        \
+      ZSTREAMER_NODE_CONFIG_INIT(inst, true);                                  \
   DEVICE_DT_INST_DEFINE(                                                       \
       inst, zstreamer_node_common_init, NULL, &passthrough_node_data_##inst,   \
       &passthrough_node_config_##inst, POST_KERNEL,                            \

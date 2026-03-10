@@ -44,7 +44,6 @@
 			sample-rate-hz = <1000>;
 			samples = <16>;
 			children = <&counter>;
-			thread-stack-size = <2048>;
 		};
 
 		/* 8-bit source */
@@ -54,7 +53,6 @@
 			sample-rate-hz = <1000>;
 			samples = <16>;
 			children = <&counter>;
-			thread-stack-size = <2048>;
 		};
 
 		counter: counter-sink {

@@ -24,6 +24,10 @@ uint32_t fake_dac_get_recorded_count(const struct device *dev);
 /** Get the idx-th recorded value.  Returns 0 if idx is out of range. */
 uint32_t fake_dac_get_recorded_value(const struct device *dev, uint32_t idx);
 
+/** Get the channel of the idx-th recorded write.  Returns 0xFF if out of range.
+ */
+uint8_t fake_dac_get_recorded_channel(const struct device *dev, uint32_t idx);
+
 void fake_dac_reset(const struct device *dev);
 
 #ifdef __cplusplus

@@ -63,18 +63,17 @@ extern void zstreamer_filter_thread_entry(void *p1, void *p2, void *p3);
  * Initializes both the normal children (routed on process() returning 1)
  * and the false-children (routed on process() returning 0).
  *
- * Usage: .common = ZSTREAMER_FILTER_CONFIG_INIT(inst),
+ * Usage: .common = ZSTREAMER_FILTER_CONFIG_INIT(inst, true),
  *
- * @param inst  Devicetree instance number.
+ * @param inst      Devicetree instance number.
+ * @param _readonly true if process() never modifies the buffer contents.
  */
-#define ZSTREAMER_FILTER_CONFIG_INIT(inst)                                     \
+#define ZSTREAMER_FILTER_CONFIG_INIT(inst, _readonly)                          \
   {.common = {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(                               \
-       DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),               \
-       DT_INST_PROP(inst, thread_priority), zstreamer_filter_children_##inst,  \
-       Z_ZSTREAMER_NUM_CHILDREN(DT_DRV_INST(inst)),                            \
-       zstreamer_filter_thread_entry)},                                        \
+       inst, zstreamer_filter_children_##inst, Z_ZSTREAMER_NUM_CHILDREN(inst), \
+       zstreamer_filter_thread_entry, _readonly)},                             \
    .false_children = zstreamer_filter_false_children_##inst,                   \
-   .num_false_children = Z_ZSTREAMER_NUM_FALSE_CHILDREN(DT_DRV_INST(inst))}
+   .num_false_children = Z_ZSTREAMER_NUM_FALSE_CHILDREN(inst)}
 
 /**
  * @brief Filter node data initializer.
@@ -106,23 +105,13 @@ extern void zstreamer_filter_thread_entry(void *p1, void *p2, void *p3);
  * Must be called BEFORE defining the driver's data/config structs so
  * that these symbols are visible to their initialisers.
  *
- * @param inst     Devicetree instance number.
- * @param node_id  Devicetree node identifier.
- */
-#define ZSTREAMER_FILTER_DT_PRE_DEFINE(inst, node_id)                          \
-  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_filter, inst, node_id);                \
-  Z_ZSTREAMER_FALSE_CHILDREN_DEFINE(zstreamer_filter, inst, node_id);          \
-  static K_THREAD_STACK_DEFINE(zstreamer_filter_stack_##inst,                  \
-                               DT_PROP(node_id, thread_stack_size))
-
-/**
- * @brief Convenience wrapper for ZSTREAMER_FILTER_DT_PRE_DEFINE using
- *        DT_DRV_INST.
- *
  * @param inst  Devicetree instance number.
  */
 #define ZSTREAMER_FILTER_DT_INST_PRE_DEFINE(inst)                              \
-  ZSTREAMER_FILTER_DT_PRE_DEFINE(inst, DT_DRV_INST(inst))
+  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_filter, inst);                         \
+  Z_ZSTREAMER_FALSE_CHILDREN_DEFINE(zstreamer_filter, inst);                   \
+  static K_THREAD_STACK_DEFINE(zstreamer_filter_stack_##inst,                  \
+                               ZSTREAMER_THREAD_STACK_SIZE)
 
 /**
  * @}
@@ -130,17 +119,17 @@ extern void zstreamer_filter_thread_entry(void *p1, void *p2, void *p3);
 
 /** @cond INTERNAL_HIDDEN */
 
-#define Z_ZSTREAMER_FALSE_CHILDREN_DEFINE(prefix, inst, node_id)               \
+#define Z_ZSTREAMER_FALSE_CHILDREN_DEFINE(prefix, inst)                        \
   static const struct device *const prefix##_false_children_##inst[] = {       \
       COND_CODE_1(                                                             \
-          DT_NODE_HAS_PROP(node_id, false_children),                           \
-          (DT_FOREACH_PROP_ELEM_SEP(node_id, false_children,                   \
+          DT_NODE_HAS_PROP(DT_DRV_INST(inst), false_children),                 \
+          (DT_FOREACH_PROP_ELEM_SEP(DT_DRV_INST(inst), false_children,         \
                                     Z_ZSTREAMER_NODE_CHILD_DEV_GET, (, ))),    \
           ())}
 
-#define Z_ZSTREAMER_NUM_FALSE_CHILDREN(node_id)                                \
-  COND_CODE_1(DT_NODE_HAS_PROP(node_id, false_children),                       \
-              (DT_PROP_LEN(node_id, false_children)), (0))
+#define Z_ZSTREAMER_NUM_FALSE_CHILDREN(inst)                                   \
+  COND_CODE_1(DT_NODE_HAS_PROP(DT_DRV_INST(inst), false_children),             \
+              (DT_PROP_LEN(DT_DRV_INST(inst), false_children)), (0))
 
 /** @endcond */
 

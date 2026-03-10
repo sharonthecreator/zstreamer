@@ -2,10 +2,10 @@
  * Copyright (c) 2026 sharonthecreator
  * SPDX-License-Identifier: Apache-2.0
  *
- * ADC-to-FakeSink sample on Nucleo U575ZI-Q.
+ * ADC-to-DAC sample on Nucleo U575ZI-Q.
  *
  * Captures dual-channel 12-bit ADC data from PA0 (ADC1_IN0) and
- * PA1 (ADC1_IN1) at ~1 kHz using Zephyr's portable ADC API.
+ * PA1 (ADC1_IN1) at ~1 kHz and outputs to DAC1 channels 1 and 2.
  */
 
 &adc1 {
@@ -30,6 +30,10 @@
 	};
 };
 
+&dac1 {
+	status = "okay";
+};
+
 / {
 	streaming_graph: streaming-graph {
 		compatible = "zstreamer,graph";
@@ -41,13 +45,15 @@
 			io-channels = <&adc1 0>, <&adc1 1>;
 			sample-rate-hz = <1000>;
 			samples = <64>;
-			children = <&fake_sinker>;
+			children = <&dac_sinker>;
 			autostart;
-			thread-stack-size = <2048>;
 		};
 
-		fake_sinker: fake-sinker {
-			compatible = "zstreamer,fake-sink";
+		dac_sinker: dac-sinker {
+			compatible = "zstreamer,dac-sink";
+			dac-device = <&dac1>;
+			dac-channel-ids = <1 2>;
+			dac-resolution = <12>;
 		};
 	};
 };

@@ -91,15 +91,11 @@ extern void zstreamer_source_thread_entry(void *p1, void *p2, void *p3);
  */
 #define ZSTREAMER_SOURCE_CONFIG_INIT(inst)                                     \
   {                                                                            \
-    .common = {                                                                \
-      Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(                                       \
-          DT_DRV_INST(inst), DT_INST_PROP(inst, thread_stack_size),            \
-          DT_INST_PROP(inst, thread_priority),                                 \
-          zstreamer_source_children_##inst,                                    \
-          Z_ZSTREAMER_NUM_CHILDREN(DT_DRV_INST(inst)),                         \
-          zstreamer_source_thread_entry)                                       \
-    },                                                                         \
-    .autostart = DT_INST_PROP_OR(inst, autostart, false),                      \
+      .common = {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(                            \
+          inst, zstreamer_source_children_##inst,                              \
+          Z_ZSTREAMER_NUM_CHILDREN(inst), zstreamer_source_thread_entry,       \
+          false)},                                                             \
+      .autostart = DT_INST_PROP_OR(inst, autostart, false),                    \
   }
 
 /**
@@ -132,22 +128,12 @@ extern void zstreamer_source_thread_entry(void *p1, void *p2, void *p3);
  * Must be called BEFORE defining the driver's data/config structs so
  * that these symbols are visible to their initialisers.
  *
- * @param inst     Devicetree instance number.
- * @param node_id  Devicetree node identifier.
- */
-#define ZSTREAMER_SOURCE_DT_PRE_DEFINE(inst, node_id)                          \
-  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_source, inst, node_id);                \
-  static K_THREAD_STACK_DEFINE(zstreamer_source_stack_##inst,                  \
-                               DT_PROP(node_id, thread_stack_size))
-
-/**
- * @brief Convenience wrapper for ZSTREAMER_SOURCE_DT_PRE_DEFINE using
- *        DT_DRV_INST.
- *
  * @param inst  Devicetree instance number.
  */
 #define ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst)                              \
-  ZSTREAMER_SOURCE_DT_PRE_DEFINE(inst, DT_DRV_INST(inst))
+  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_source, inst);                         \
+  static K_THREAD_STACK_DEFINE(zstreamer_source_stack_##inst,                  \
+                               ZSTREAMER_THREAD_STACK_SIZE)
 
 /**
  * @}

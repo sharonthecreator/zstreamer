@@ -151,10 +151,10 @@ ZTEST(zstreamer_node, test_high_throughput) {
   bufs = count_sink_get_buf_count(sink_dev);
   bytes = count_sink_get_byte_count(sink_dev);
 
-  zassert_true(bufs >= 100,
-               "expected >= 100 bufs through processor, got %u", bufs);
-  zassert_equal(bytes, bufs * BUFFER_SIZE,
-                "byte count %u != bufs %u * %u", bytes, bufs, BUFFER_SIZE);
+  zassert_true(bufs >= 100, "expected >= 100 bufs through processor, got %u",
+               bufs);
+  zassert_equal(bytes, bufs * BUFFER_SIZE, "byte count %u != bufs %u * %u",
+                bytes, bufs, BUFFER_SIZE);
 
   assert_pool_free(graph_dev);
 }
@@ -204,8 +204,8 @@ ZTEST(zstreamer_node, test_buffer_rate_matches_interval) {
   zassert_true(bufs >= (uint32_t)(expected * 0.9),
                "rate too low: expected >= %u bufs (90%% of %u), got %u",
                (uint32_t)(expected * 0.9), expected, bufs);
-  zassert_true(bufs <= expected + 1,
-               "got %u bufs, exceeds expected %u", bufs, expected);
+  zassert_true(bufs <= expected + 1, "got %u bufs, exceeds expected %u", bufs,
+               expected);
 }
 
 ZTEST(zstreamer_node, test_low_pipeline_overhead) {
@@ -227,10 +227,9 @@ ZTEST(zstreamer_node, test_low_pipeline_overhead) {
   uint32_t overhead_ms = (run_ms / bufs) - NUMGEN_SLEEP_MS;
 
   zassert_true(bufs >= (uint32_t)(expected * 0.9),
-               "pipeline overhead too high: got %u bufs, expected >= %u",
-               bufs, (uint32_t)(expected * 0.9));
+               "pipeline overhead too high: got %u bufs, expected >= %u", bufs,
+               (uint32_t)(expected * 0.9));
   zassert_true(overhead_ms <= TICK_MS,
-               "per-buffer overhead %u ms exceeds 1 tick (%u ms)",
-               overhead_ms, TICK_MS);
+               "per-buffer overhead %u ms exceeds 1 tick (%u ms)", overhead_ms,
+               TICK_MS);
 }
-

@@ -9,7 +9,7 @@
 
 #include <zstreamer/source.h>
 
-LOG_MODULE_REGISTER(adc2fakesink, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(adc2dac, LOG_LEVEL_INF);
 
 #define ADC_SRC_NODE DT_NODELABEL(adc_source)
 
@@ -17,7 +17,7 @@ int main(void) {
   const struct device *adc_src = DEVICE_DT_GET(ADC_SRC_NODE);
 
   /* Pipeline starts automatically via DTS autostart property. */
-  LOG_INF("ADC capture pipeline running (autostart)");
+  LOG_INF("ADC-to-DAC pipeline running (autostart)");
 
   /* Let it run for a while, then stop */
   k_sleep(K_SECONDS(10));

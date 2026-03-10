@@ -12,7 +12,6 @@
 		numgen_source: numgen-source {
 			compatible = "zstreamer,numgen-src";
 			children = <&passthrough>;
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 			sleep-ms = <10>;
 		};
@@ -20,13 +19,11 @@
 		passthrough: passthrough {
 			compatible = "zstreamer,passthrough-node";
 			children = <&count_sinker>;
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 		};
 
 		count_sinker: count-sinker {
 			compatible = "zstreamer,count-sink";
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 		};
 	};

@@ -32,14 +32,12 @@
 		numgen_source: numgen-source {
 			compatible = "zstreamer,numgen-src";
 			children = <&fs_sinker>;
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 			sleep-ms = <1>;
 		};
 
 		fs_sinker: fs-sinker {
 			compatible = "zstreamer,fs-sink";
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 			mount-path = "/lfs";
 			filename-prefix = "test";
@@ -51,14 +49,12 @@
 		numgen_delta: numgen-delta {
 			compatible = "zstreamer,numgen-src";
 			children = <&fs_sinker_delta>;
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 			sleep-ms = <100>;
 		};
 
 		fs_sinker_delta: fs-sinker-delta {
 			compatible = "zstreamer,fs-sink";
-			thread-stack-size = <2048>;
 			thread-priority = <10>;
 			mount-path = "/lfs";
 			filename-prefix = "delta";

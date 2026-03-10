@@ -20,6 +20,7 @@ struct fake_dac_data {
   atomic_t write_count;
   uint32_t last_value;
   uint32_t recorded[FAKE_DAC_MAX_RECORDED];
+  uint8_t recorded_ch[FAKE_DAC_MAX_RECORDED];
   uint32_t num_recorded;
 };
 
@@ -34,12 +35,11 @@ static int fake_dac_write_value(const struct device *dev, uint8_t channel,
                                 uint32_t value) {
   struct fake_dac_data *data = dev->data;
 
-  ARG_UNUSED(channel);
-
   data->last_value = value;
 
   if (data->num_recorded < FAKE_DAC_MAX_RECORDED) {
     data->recorded[data->num_recorded] = value;
+    data->recorded_ch[data->num_recorded] = channel;
     data->num_recorded++;
   }
 
@@ -72,12 +72,22 @@ uint32_t fake_dac_get_recorded_value(const struct device *dev, uint32_t idx) {
   return data->recorded[idx];
 }
 
+uint8_t fake_dac_get_recorded_channel(const struct device *dev, uint32_t idx) {
+  struct fake_dac_data *data = dev->data;
+
+  if (idx >= data->num_recorded) {
+    return 0xFF;
+  }
+  return data->recorded_ch[idx];
+}
+
 void fake_dac_reset(const struct device *dev) {
   struct fake_dac_data *data = dev->data;
   atomic_set(&data->write_count, 0);
   data->last_value = 0;
   data->num_recorded = 0;
   memset(data->recorded, 0, sizeof(data->recorded));
+  memset(data->recorded_ch, 0, sizeof(data->recorded_ch));
 }
 
 static int fake_dac_init(const struct device *dev) {

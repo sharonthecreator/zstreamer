@@ -62,7 +62,7 @@ static const struct zstreamer_node_driver_api pwm_sink_api = {
 };
 
 #define PWM_SINK_DEFINE(inst)                                                  \
-  BUILD_ASSERT(DT_INST_PROP(inst, max_value) > DT_INST_PROP(inst, min_value), \
+  BUILD_ASSERT(DT_INST_PROP(inst, max_value) > DT_INST_PROP(inst, min_value),  \
                "pwm-sink: max-value must be greater than min-value");          \
   ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst);                                     \
   static struct pwm_sink_data pwm_sink_data_##inst = {                         \
@@ -70,7 +70,7 @@ static const struct zstreamer_node_driver_api pwm_sink_api = {
   };                                                                           \
   static const struct pwm_sink_config pwm_sink_config_##inst = {               \
       .common = ZSTREAMER_SINK_CONFIG_INIT(inst),                              \
-      .pwm = PWM_DT_SPEC_GET(DT_DRV_INST(inst)),                              \
+      .pwm = PWM_DT_SPEC_GET(DT_DRV_INST(inst)),                               \
       .min_value = DT_INST_PROP(inst, min_value),                              \
       .max_value = DT_INST_PROP(inst, max_value),                              \
   };                                                                           \

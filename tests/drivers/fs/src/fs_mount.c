@@ -15,28 +15,28 @@
 FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(lfs_storage);
 
 static struct fs_mount_t lfs_mnt = {
-	.type = FS_LITTLEFS,
-	.fs_data = &lfs_storage,
-	.storage_dev = (void *)TEST_PARTITION_ID,
-	.mnt_point = "/lfs",
+    .type = FS_LITTLEFS,
+    .fs_data = &lfs_storage,
+    .storage_dev = (void *)TEST_PARTITION_ID,
+    .mnt_point = "/lfs",
 };
 
-static int mount_littlefs(void)
-{
-	int ret;
+static int mount_littlefs(void) {
+  int ret;
 
-	ret = fs_mount(&lfs_mnt);
-	if (ret == -EINVAL) {
-		/* Unformatted — format and retry */
-		ret = fs_mkfs(FS_LITTLEFS, (uintptr_t)TEST_PARTITION_ID, NULL, 0);
-		if (ret != 0) {
-			return ret;
-		}
-		ret = fs_mount(&lfs_mnt);
-	}
+  ret = fs_mount(&lfs_mnt);
+  if (ret == -EINVAL) {
+    /* Unformatted — format and retry */
+    ret = fs_mkfs(FS_LITTLEFS, (uintptr_t)TEST_PARTITION_ID, NULL, 0);
+    if (ret != 0) {
+      return ret;
+    }
+    ret = fs_mount(&lfs_mnt);
+  }
 
-	return ret;
+  return ret;
 }
 
-/* Run at APPLICATION level, after flash + LittleFS registration (POST_KERNEL) */
+/* Run at APPLICATION level, after flash + LittleFS registration (POST_KERNEL)
+ */
 SYS_INIT(mount_littlefs, APPLICATION, 0);
