@@ -117,6 +117,7 @@ west build -b nucleo_u575zi_q samples/uart2uart
 
 ### Subsystem
 
+- [x] **CI** — GitHub Actions with clang-format, editorconfig, twister tests, and sample builds
 - [ ] **Buffer metadata** — standardized metadata header on `net_buf` (timestamps, sequence numbers, sample rate)
 - [ ] **Buffer typing** — typed buffers (audio, raw, encoded, …) with type-negotiation between nodes, allowing drivers to register per-type `process` callbacks (preferably at compile-time)
 - [ ] **Runtime settings** — configure driver parameters (e.g. LoRa frequency, ADC sample rate) at runtime via Zephyr's `settings` subsystem, persisted across reboots
