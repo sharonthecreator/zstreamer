@@ -50,12 +50,12 @@ extern "C" {
  * to this type.
  */
 struct zstreamer_node_config {
-  const struct device *graph;
-  k_thread_entry_t thread_entry;
-  int thread_priority;
-  bool readonly;
-  const struct device *const *children;
-  size_t num_children;
+	const struct device *graph;
+	k_thread_entry_t thread_entry;
+	int thread_priority;
+	bool readonly;
+	const struct device *const *children;
+	size_t num_children;
 };
 
 /**
@@ -66,10 +66,10 @@ struct zstreamer_node_config {
  * to this type.
  */
 struct zstreamer_node_data {
-  const struct device *dev;
-  struct k_fifo fifo;
-  struct k_thread thread;
-  k_thread_stack_t *stack;
+	const struct device *dev;
+	struct k_fifo fifo;
+	struct k_thread thread;
+	k_thread_stack_t *stack;
 };
 
 /**
@@ -86,7 +86,7 @@ struct zstreamer_node_data {
  *                1 = true (route to children), <0 = error.
  */
 __subsystem struct zstreamer_node_driver_api {
-  int (*process)(const struct device *dev, struct net_buf *buf);
+	int (*process)(const struct device *dev, struct net_buf *buf);
 };
 
 /**
@@ -96,8 +96,7 @@ __subsystem struct zstreamer_node_driver_api {
  * @param timeout Allocation timeout.
  * @return Pointer to allocated net_buf, or NULL on timeout.
  */
-struct net_buf *zstreamer_node_alloc_buf(const struct device *dev,
-                                         k_timeout_t timeout);
+struct net_buf *zstreamer_node_alloc_buf(const struct device *dev, k_timeout_t timeout);
 
 /**
  * @brief Common init for all node types.
@@ -121,10 +120,8 @@ extern void zstreamer_node_thread_entry(void *p1, void *p2, void *p3);
  *
  * Honours the copy-on-write / readonly optimisation.
  */
-extern void zstreamer_node_distribute(const struct device *dev,
-                                      struct net_buf *buf,
-                                      const struct device *const *children,
-                                      size_t num_children);
+extern void zstreamer_node_distribute(const struct device *dev, struct net_buf *buf,
+				      const struct device *const *children, size_t num_children);
 
 /**
  * @brief Drain (unref) all pending buffers from a fifo.
@@ -144,10 +141,10 @@ extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
  * @param inst      Devicetree instance number.
  * @param _readonly true if process() never modifies the buffer contents.
  */
-#define ZSTREAMER_NODE_CONFIG_INIT(inst, _readonly)                            \
-  {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, zstreamer_node_children_##inst,     \
-                                     Z_ZSTREAMER_NUM_CHILDREN(inst),           \
-                                     zstreamer_node_thread_entry, _readonly)}
+#define ZSTREAMER_NODE_CONFIG_INIT(inst, _readonly)                                                \
+	{Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, zstreamer_node_children_##inst,                   \
+					   Z_ZSTREAMER_NUM_CHILDREN(inst),                         \
+					   zstreamer_node_thread_entry, _readonly)}
 
 /**
  * @brief Through-node data initializer.
@@ -162,8 +159,7 @@ extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_NODE_DATA_INIT(inst)                                         \
-  {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_node, inst)}
+#define ZSTREAMER_NODE_DATA_INIT(inst) {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_node, inst)}
 
 /**
  * @brief Pre-define the thread stack and children array for a through-node.
@@ -178,10 +174,9 @@ extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_NODE_DT_INST_PRE_DEFINE(inst)                                \
-  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_node, inst);                           \
-  static K_THREAD_STACK_DEFINE(zstreamer_node_stack_##inst,                    \
-                               ZSTREAMER_THREAD_STACK_SIZE)
+#define ZSTREAMER_NODE_DT_INST_PRE_DEFINE(inst)                                                    \
+	Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_node, inst);                                         \
+	static K_THREAD_STACK_DEFINE(zstreamer_node_stack_##inst, ZSTREAMER_THREAD_STACK_SIZE)
 
 /**
  * @}
@@ -189,19 +184,17 @@ extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
 
 /** @cond INTERNAL_HIDDEN */
 
-#define Z_ZSTREAMER_NODE_BASE_DATA_INIT(prefix, inst)                          \
-  .stack = prefix##_stack_##inst
+#define Z_ZSTREAMER_NODE_BASE_DATA_INIT(prefix, inst) .stack = prefix##_stack_##inst
 
-#define Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, _children, _num_children,      \
-                                          _entry, _readonly)                   \
-  .graph = DEVICE_DT_GET(DT_PARENT(DT_DRV_INST(inst))),                        \
-  .thread_entry = _entry,                                                      \
-  .thread_priority = DT_INST_PROP(inst, thread_priority),                      \
-  .readonly = _readonly, .children = _children, .num_children = _num_children
+#define Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, _children, _num_children, _entry, _readonly)       \
+	.graph = DEVICE_DT_GET(DT_PARENT(DT_DRV_INST(inst))), .thread_entry = _entry,              \
+	.thread_priority = DT_INST_PROP(inst, thread_priority), .readonly = _readonly,             \
+	.children = _children, .num_children = _num_children
 
-#define Z_ZSTREAMER_NODE_CHILD_DEV_GET(node_id, prop, idx)                     \
-  DEVICE_DT_GET(DT_PHANDLE_BY_IDX(node_id, prop, idx))
+#define Z_ZSTREAMER_NODE_CHILD_DEV_GET(node_id, prop, idx)                                         \
+	DEVICE_DT_GET(DT_PHANDLE_BY_IDX(node_id, prop, idx))
 
+/* clang-format off */
 #define Z_ZSTREAMER_CHILDREN_DEFINE(prefix, inst)                              \
   static const struct device *const prefix##_children_##inst[] = {COND_CODE_1( \
       DT_NODE_HAS_PROP(DT_DRV_INST(inst), children),                           \
@@ -212,6 +205,7 @@ extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
 #define Z_ZSTREAMER_NUM_CHILDREN(inst)                                         \
   COND_CODE_1(DT_NODE_HAS_PROP(DT_DRV_INST(inst), children),                   \
               (DT_PROP_LEN(DT_DRV_INST(inst), children)), (0))
+/* clang-format on */
 
 /** @endcond */
 

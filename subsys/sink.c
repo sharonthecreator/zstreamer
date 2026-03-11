@@ -16,36 +16,38 @@ LOG_MODULE_REGISTER(zstreamer_sink, CONFIG_ZSTREAMER_LOG_LEVEL);
 /* Thread entry                                                        */
 /* ------------------------------------------------------------------ */
 
-int zstreamer_sink_common_init(const struct device *dev) {
-  return zstreamer_node_common_init(dev);
+int zstreamer_sink_common_init(const struct device *dev)
+{
+	return zstreamer_node_common_init(dev);
 }
 
 /* ------------------------------------------------------------------ */
 /* Thread entry                                                        */
 /* ------------------------------------------------------------------ */
 
-void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3) {
-  const struct device *dev = (const struct device *)p1;
-  struct zstreamer_sink_data *data = (struct zstreamer_sink_data *)dev->data;
-  const struct zstreamer_node_driver_api *api =
-      (const struct zstreamer_node_driver_api *)dev->api;
+void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3)
+{
+	const struct device *dev = (const struct device *)p1;
+	struct zstreamer_sink_data *data = (struct zstreamer_sink_data *)dev->data;
+	const struct zstreamer_node_driver_api *api =
+		(const struct zstreamer_node_driver_api *)dev->api;
 
-  ARG_UNUSED(p2);
-  ARG_UNUSED(p3);
+	ARG_UNUSED(p2);
+	ARG_UNUSED(p3);
 
-  while (true) {
-    struct net_buf *buf = k_fifo_get(&data->common.fifo, K_FOREVER);
+	while (true) {
+		struct net_buf *buf = k_fifo_get(&data->common.fifo, K_FOREVER);
 
-    if (buf == NULL) {
-      continue;
-    }
+		if (buf == NULL) {
+			continue;
+		}
 
-    int ret = api->process(dev, buf);
+		int ret = api->process(dev, buf);
 
-    if (ret != 0) {
-      LOG_ERR("[%s] process error: %d", dev->name, ret);
-    }
+		if (ret != 0) {
+			LOG_ERR("[%s] process error: %d", dev->name, ret);
+		}
 
-    net_buf_unref(buf);
-  }
+		net_buf_unref(buf);
+	}
 }
