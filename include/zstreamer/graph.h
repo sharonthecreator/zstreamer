@@ -21,12 +21,12 @@ extern "C" {
 
 /** Graph device configuration (populated by DT macros). */
 struct zstreamer_graph_config {
-  struct net_buf_pool *pool;
+	struct net_buf_pool *pool;
 };
 
 /** Graph device runtime data. */
 struct zstreamer_graph_data {
-  atomic_t started;
+	atomic_t started;
 };
 
 #ifdef __cplusplus

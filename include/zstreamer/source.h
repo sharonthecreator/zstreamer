@@ -29,15 +29,15 @@ extern "C" {
  */
 
 struct zstreamer_source_config {
-  struct zstreamer_node_config common;
-  bool autostart;
+	struct zstreamer_node_config common;
+	bool autostart;
 };
 
 struct zstreamer_source_data {
-  struct zstreamer_node_data common;
-  atomic_t running;
-  struct k_sem run_sem;
-  struct k_sem idle_sem;
+	struct zstreamer_node_data common;
+	atomic_t running;
+	struct k_sem run_sem;
+	struct k_sem idle_sem;
 };
 
 /**
@@ -89,14 +89,13 @@ extern void zstreamer_source_thread_entry(void *p1, void *p2, void *p3);
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_SOURCE_CONFIG_INIT(inst)                                     \
-  {                                                                            \
-      .common = {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(                            \
-          inst, zstreamer_source_children_##inst,                              \
-          Z_ZSTREAMER_NUM_CHILDREN(inst), zstreamer_source_thread_entry,       \
-          false)},                                                             \
-      .autostart = DT_INST_PROP_OR(inst, autostart, false),                    \
-  }
+#define ZSTREAMER_SOURCE_CONFIG_INIT(inst)                                                         \
+	{                                                                                          \
+		.common = {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(                                      \
+			inst, zstreamer_source_children_##inst, Z_ZSTREAMER_NUM_CHILDREN(inst),    \
+			zstreamer_source_thread_entry, false)},                                    \
+		.autostart = DT_INST_PROP_OR(inst, autostart, false),                              \
+	}
 
 /**
  * @brief Source node data initializer.
@@ -105,17 +104,17 @@ extern void zstreamer_source_thread_entry(void *p1, void *p2, void *p3);
  * Requires ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst) to have been called
  * earlier so that the stack symbol is visible.  Initializes the running
  * flag to 0 (stopped).  Zephyr runtime fields and semaphores are
- * initialized later by zstreamer_node_common_init().
+ * initialized later by zstreamer_source_common_init().
  *
  * Usage: .common = ZSTREAMER_SOURCE_DATA_INIT(inst),
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_SOURCE_DATA_INIT(inst)                                       \
-  {                                                                            \
-      .common = {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_source, inst)},     \
-      .running = ATOMIC_INIT(0),                                               \
-  }
+#define ZSTREAMER_SOURCE_DATA_INIT(inst)                                                           \
+	{                                                                                          \
+		.common = {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_source, inst)},               \
+		.running = ATOMIC_INIT(0),                                                         \
+	}
 
 /**
  * @brief Pre-define the thread stack and children array for a source node.
@@ -130,10 +129,9 @@ extern void zstreamer_source_thread_entry(void *p1, void *p2, void *p3);
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst)                              \
-  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_source, inst);                         \
-  static K_THREAD_STACK_DEFINE(zstreamer_source_stack_##inst,                  \
-                               ZSTREAMER_THREAD_STACK_SIZE)
+#define ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst)                                                  \
+	Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_source, inst);                                       \
+	static K_THREAD_STACK_DEFINE(zstreamer_source_stack_##inst, ZSTREAMER_THREAD_STACK_SIZE)
 
 /**
  * @}

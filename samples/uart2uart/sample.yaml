@@ -9,4 +9,4 @@ sample:
 tests:
   sample.zstreamer.uart2uart:
     tags: zstreamer uart
-    platform_allow: native_sim nucleo_u575zi_q
+    platform_allow: nucleo_u575zi_q

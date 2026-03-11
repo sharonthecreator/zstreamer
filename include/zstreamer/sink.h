@@ -30,12 +30,12 @@ extern "C" {
  */
 
 struct zstreamer_sink_config {
-  struct zstreamer_node_config common;
-  /* No children — sinks are terminal, children will be NULLed. */
+	struct zstreamer_node_config common;
+	/* No children — sinks are terminal, children will be NULLed. */
 };
 
 struct zstreamer_sink_data {
-  struct zstreamer_node_data common;
+	struct zstreamer_node_data common;
 };
 
 /* Sink nodes have no start/stop — they run automatically. */
@@ -68,13 +68,13 @@ extern void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3);
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_SINK_CONFIG_INIT(inst)                                       \
-  {                                                                            \
-    .common = {                                                                \
-      Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, NULL, 0,                         \
-                                        zstreamer_sink_thread_entry, true),    \
-    }                                                                          \
-  }
+#define ZSTREAMER_SINK_CONFIG_INIT(inst)                                                           \
+	{                                                                                          \
+		.common = {                                                                        \
+			Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, NULL, 0,                           \
+							  zstreamer_sink_thread_entry, true),      \
+		}                                                                                  \
+	}
 
 /**
  * @brief Sink node data initializer.
@@ -88,10 +88,10 @@ extern void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3);
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_SINK_DATA_INIT(inst)                                         \
-  {                                                                            \
-      .common = {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_sink, inst)},       \
-  }
+#define ZSTREAMER_SINK_DATA_INIT(inst)                                                             \
+	{                                                                                          \
+		.common = {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_sink, inst)},                 \
+	}
 
 /**
  * @brief Pre-define the thread stack for a sink node instance.
@@ -104,9 +104,8 @@ extern void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3);
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst)                                \
-  static K_THREAD_STACK_DEFINE(zstreamer_sink_stack_##inst,                    \
-                               ZSTREAMER_THREAD_STACK_SIZE)
+#define ZSTREAMER_SINK_DT_INST_PRE_DEFINE(inst)                                                    \
+	static K_THREAD_STACK_DEFINE(zstreamer_sink_stack_##inst, ZSTREAMER_THREAD_STACK_SIZE)
 
 /**
  * @}
