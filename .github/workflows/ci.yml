@@ -77,6 +77,8 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/zephyrproject-rtos/ci:v0.28.7
+    env:
+      ZEPHYR_TOOLCHAIN_VARIANT: host
     steps:
       - uses: actions/checkout@v4
 
@@ -104,8 +106,21 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/zephyrproject-rtos/ci:v0.28.7
+    env:
+      ZEPHYR_SDK_INSTALL_DIR: /opt/zephyr-sdk
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Zephyr SDK
+        run: |
+          SDK_VER=0.17.0
+          SDK_BASE=https://github.com/zephyrproject-rtos/sdk-ng
+          SDK_FILE=zephyr-sdk-${SDK_VER}_linux-x86_64_minimal.tar.xz
+          wget -q ${SDK_BASE}/releases/download/v${SDK_VER}/${SDK_FILE}
+          tar xf ${SDK_FILE}
+          mv zephyr-sdk-${SDK_VER} /opt/zephyr-sdk
+          /opt/zephyr-sdk/setup.sh -t arm-zephyr-eabi -h -c
+          rm ${SDK_FILE}
 
       - name: West init and update
         run: |
