@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+
+[general]
+ignore=body-is-missing,title-trailing-punctuation
+contrib=contrib-title-conventional-commits
+
+[title-max-length]
+line-length=75
+
+[title-min-length]
+min-length=10
+
+[body-max-line-length]
+line-length=75
+
+[contrib-title-conventional-commits]
+types=drivers,subsys,tests,samples,ci,docs,include
