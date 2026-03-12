@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "zstreamer",
+  "project_id": "00957da1-df5d-437f-9af3-459980ec46d8"
+}

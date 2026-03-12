@@ -44,3 +44,27 @@ timeout 120s ./build/test-<name>/zephyr/zephyr.exe
 - Linux, no Docker. Board: `native_sim`
 - No parallel `west build` against same Zephyr tree
 - native_sim: simulated time advances only when ALL threads blocked — use `k_sleep`/`k_yield` in loops
+
+## Commit Messages
+
+Zephyr-style with area prefixes: `drivers: dac: fix value masking`, `subsys: node: add metadata`, `tests: dac: add multi-channel test`, `samples: sine2pwm: update overlay`, `ci: add clang-format`
+
+Trailer order: body, blank line, then:
+```
+Signed-off-by: Sharon Naim <sharonthecreator@gmail.com>
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+```
+
+## Issue Tracking
+
+This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
+
+- Check ready work: `bd ready --json`
+- Create issues: `bd create "Title" --description="Details" -t feature -p 2 --json`
+- Use stdin for descriptions with special characters: `echo 'text' | bd create "Title" --description=- --json`
+- Claim work: `bd update <id> --claim --json`
+- Close work: `bd close <id> --reason "Done" --json`
+- Link discovered work: `--deps discovered-from:<parent-id>`
+- Do NOT use `bd edit` (interactive editor) — use `bd update` with flags instead
+- Always use `--json` flag for programmatic use
+- Each issue gets its own branch and PR into `main`

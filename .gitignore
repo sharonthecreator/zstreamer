@@ -57,3 +57,7 @@ dkms.conf
 build*/
 .cache/
 twister-out*/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
