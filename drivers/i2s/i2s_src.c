@@ -93,7 +93,7 @@ static int i2s_src_init(const struct device *dev)
 		.frame_clk_freq = cfg->sample_rate_hz,
 		.block_size = cfg->block_size,
 		.mem_slab = cfg->rx_slab,
-		.timeout = K_MSEC(1000),
+		.timeout = 1000,
 	};
 
 	ret = i2s_configure(cfg->i2s_dev, I2S_DIR_RX, &i2s_cfg);
