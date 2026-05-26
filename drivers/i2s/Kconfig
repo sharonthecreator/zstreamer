@@ -1,0 +1,25 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_I2S
+	bool
+
+config ZSTREAMER_I2S_SRC
+	bool "I2S source driver"
+	depends on DT_HAS_ZSTREAMER_I2S_SRC_ENABLED
+	depends on ZSTREAMER
+	depends on I2S
+	select ZSTREAMER_I2S
+	help
+	  Enable the I2S source streaming node driver.
+	  Captures audio samples from an I2S microphone using
+	  Zephyr's I2S API (blocking i2s_read in the source thread).
+
+config ZSTREAMER_I2S_SLAB_COUNT
+	int "I2S RX slab block count"
+	default 4
+	depends on ZSTREAMER_I2S_SRC
+	help
+	  Number of blocks in the I2S RX memory slab.
+	  At least 2 for double-buffering; more reduces the chance
+	  of overruns at high sample rates.
