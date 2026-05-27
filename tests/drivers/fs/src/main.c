@@ -67,11 +67,11 @@ static void cleanup(void *fixture)
 	fs_sink_close(delta_sink_dev);
 	delete_prefixed_files("test");
 	delete_prefixed_files("delta");
-	if (fs_stat("/lfs/.test.idx", &idx_entry) == 0) {
-		fs_unlink("/lfs/.test.idx");
+	if (fs_stat("/lfs/testidx", &idx_entry) == 0) {
+		fs_unlink("/lfs/testidx");
 	}
-	if (fs_stat("/lfs/.delta.idx", &idx_entry) == 0) {
-		fs_unlink("/lfs/.delta.idx");
+	if (fs_stat("/lfs/deltaidx", &idx_entry) == 0) {
+		fs_unlink("/lfs/deltaidx");
 	}
 	fs_sink_reset(sink_dev);
 	fs_sink_reset(delta_sink_dev);
@@ -223,13 +223,13 @@ ZTEST(zstreamer_fs, test_index_persistence)
 	fs_sink_close(sink_dev);
 
 	/* .idx file should exist after rotations */
-	ret = fs_stat("/lfs/.test.idx", &entry);
+	ret = fs_stat("/lfs/testidx", &entry);
 	zassert_equal(ret, 0, ".idx missing: %d", ret);
 	zassert_equal(entry.size, sizeof(uint32_t), ".idx wrong size");
 
 	/* Read and validate the persisted index */
 	fs_file_t_init(&f);
-	ret = fs_open(&f, "/lfs/.test.idx", FS_O_READ);
+	ret = fs_open(&f, "/lfs/testidx", FS_O_READ);
 	zassert_equal(ret, 0, "open .idx: %d", ret);
 
 	nread = fs_read(&f, &saved_idx, sizeof(saved_idx));
@@ -265,7 +265,7 @@ ZTEST(zstreamer_fs, test_invalid_index_resets_to_zero)
 	uint32_t bad_idx = 9999;
 
 	fs_file_t_init(&f);
-	ret = fs_open(&f, "/lfs/.test.idx", FS_O_CREATE | FS_O_WRITE);
+	ret = fs_open(&f, "/lfs/testidx", FS_O_CREATE | FS_O_WRITE);
 	zassert_equal(ret, 0, "create .idx: %d", ret);
 	ret = fs_write(&f, &bad_idx, sizeof(bad_idx));
 	fs_close(&f);
@@ -316,8 +316,8 @@ ZTEST(zstreamer_fs, test_restart_cycle)
 		assert_pool_free(graph_dev);
 		fs_sink_close(sink_dev);
 		delete_prefixed_files("test");
-		if (fs_stat("/lfs/.test.idx", &entry) == 0) {
-			fs_unlink("/lfs/.test.idx");
+		if (fs_stat("/lfs/testidx", &entry) == 0) {
+			fs_unlink("/lfs/testidx");
 		}
 		fs_sink_reset(sink_dev);
 	}

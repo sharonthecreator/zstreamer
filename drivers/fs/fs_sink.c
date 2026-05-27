@@ -24,6 +24,7 @@ struct fs_sink_config {
 	uint32_t delta_ms_threshold;
 	uint32_t size_threshold;
 	uint32_t file_count;
+	uint32_t max_write_size;
 };
 
 struct fs_sink_data {
@@ -63,7 +64,7 @@ struct fs_sink_data {
 static int idx_path(const struct device *dev, char *buf, size_t buf_size)
 {
 	const struct fs_sink_config *cfg = dev->config;
-	int n = snprintf(buf, buf_size, "%s/.%s.idx", cfg->mount_path, cfg->filename_prefix);
+	int n = snprintf(buf, buf_size, "%s/%sidx", cfg->mount_path, cfg->filename_prefix);
 
 	if (n < 0 || (size_t)n >= buf_size) {
 		return -ENOMEM;
@@ -262,6 +263,7 @@ static bool should_rotate(const struct device *dev, size_t incoming_len)
  */
 static int fs_sink_process(const struct device *dev, struct net_buf *buf)
 {
+	const struct fs_sink_config *cfg = dev->config;
 	struct fs_sink_data *data = dev->data;
 	int ret;
 
@@ -284,16 +286,25 @@ static int fs_sink_process(const struct device *dev, struct net_buf *buf)
 		}
 	}
 
-	ssize_t written = fs_write(&data->current_file, buf->data, buf->len);
+	const uint8_t *src = buf->data;
+	size_t remaining = buf->len;
+	size_t chunk_size = cfg->max_write_size ? cfg->max_write_size : remaining;
 
-	if (written < 0) {
-		LOG_ERR("fs_write failed: %zd", written);
-		fs_close(&data->current_file);
-		data->file_opened = false;
-		return (int)written;
+	while (remaining > 0) {
+		size_t to_write = MIN(remaining, chunk_size);
+		ssize_t written = fs_write(&data->current_file, src, to_write);
+
+		if (written < 0) {
+			LOG_ERR("fs_write failed: %zd", written);
+			fs_close(&data->current_file);
+			data->file_opened = false;
+			return (int)written;
+		}
+
+		data->current_file_size += written;
+		src += written;
+		remaining -= written;
 	}
-
-	data->current_file_size += written;
 
 	/* Sync file entry so file size is visible if power is lost. */
 	fs_sync(&data->current_file);
@@ -388,6 +399,7 @@ void fs_sink_reset(const struct device *dev)
 		.delta_ms_threshold = DT_INST_PROP(inst, delta_ms_threshold),                      \
 		.size_threshold = DT_INST_PROP(inst, size_threshold),                              \
 		.file_count = DT_INST_PROP(inst, file_count),                                      \
+		.max_write_size = DT_INST_PROP(inst, max_write_size),                              \
 	};                                                                                         \
 	DEVICE_DT_INST_DEFINE(inst, fs_sink_init, NULL, &fs_sink_data_##inst,                      \
 			      &fs_sink_config_##inst, POST_KERNEL,                                 \
