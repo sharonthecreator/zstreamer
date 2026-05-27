@@ -45,6 +45,12 @@ struct fs_sink_data {
 	bool index_loaded;
 	fs_sink_filename_cb_t filename_cb;
 	void *filename_cb_user_data;
+	/**
+	 * Scratch buffers kept here instead of on the 2 KB thread stack to
+	 * avoid overflow when FatFs LFN is enabled (MAX_FILE_NAME == 255).
+	 */
+	char path_buf[MAX_FILE_NAME + 1];
+	struct fs_dirent dirent_buf;
 };
 
 /*
@@ -74,19 +80,16 @@ static int load_index(const struct device *dev)
 {
 	struct fs_sink_data *data = dev->data;
 	const struct fs_sink_config *cfg = dev->config;
-	char path[MAX_FILE_NAME + 1];
 	struct fs_file_t f;
 	int ret;
 	uint32_t idx;
 
-	ret = idx_path(dev, path, sizeof(path));
+	ret = idx_path(dev, data->path_buf, sizeof(data->path_buf));
 	if (ret < 0) {
 		return ret;
 	}
 
-	struct fs_dirent entry;
-
-	ret = fs_stat(path, &entry);
+	ret = fs_stat(data->path_buf, &data->dirent_buf);
 	if (ret < 0) {
 		/* No saved index file — start at 0 */
 		data->file_index = 0;
@@ -94,7 +97,7 @@ static int load_index(const struct device *dev)
 	}
 
 	fs_file_t_init(&f);
-	ret = fs_open(&f, path, FS_O_READ);
+	ret = fs_open(&f, data->path_buf, FS_O_READ);
 	if (ret < 0) {
 		data->file_index = 0;
 		return 0;
@@ -119,17 +122,16 @@ static int load_index(const struct device *dev)
 static int save_index(const struct device *dev)
 {
 	struct fs_sink_data *data = dev->data;
-	char path[MAX_FILE_NAME + 1];
 	struct fs_file_t f;
 	int ret;
 
-	ret = idx_path(dev, path, sizeof(path));
+	ret = idx_path(dev, data->path_buf, sizeof(data->path_buf));
 	if (ret < 0) {
 		return ret;
 	}
 
 	fs_file_t_init(&f);
-	ret = fs_open(&f, path, FS_O_CREATE | FS_O_WRITE);
+	ret = fs_open(&f, data->path_buf, FS_O_CREATE | FS_O_WRITE);
 	if (ret < 0) {
 		LOG_ERR("failed to save index: %d", ret);
 		return ret;
@@ -166,10 +168,9 @@ static int open_new_file(const struct device *dev)
 {
 	const struct fs_sink_config *cfg = dev->config;
 	struct fs_sink_data *data = dev->data;
-	char filename[MAX_FILE_NAME + 1];
 	int ret;
 
-	ret = data->filename_cb(dev, filename, sizeof(filename), cfg->mount_path,
+	ret = data->filename_cb(dev, data->path_buf, sizeof(data->path_buf), cfg->mount_path,
 				cfg->filename_prefix, data->file_index,
 				data->filename_cb_user_data);
 	if (ret < 0) {
@@ -179,9 +180,9 @@ static int open_new_file(const struct device *dev)
 
 	fs_file_t_init(&data->current_file);
 
-	ret = fs_open(&data->current_file, filename, FS_O_CREATE | FS_O_WRITE);
+	ret = fs_open(&data->current_file, data->path_buf, FS_O_CREATE | FS_O_WRITE);
 	if (ret != 0) {
-		LOG_ERR("failed to open %s: %d", filename, ret);
+		LOG_ERR("failed to open %s: %d", data->path_buf, ret);
 		return ret;
 	}
 
@@ -189,7 +190,7 @@ static int open_new_file(const struct device *dev)
 	data->current_file_size = 0;
 	data->file_opened = true;
 
-	LOG_DBG("opened %s", filename);
+	LOG_DBG("opened %s", data->path_buf);
 
 	return 0;
 }
