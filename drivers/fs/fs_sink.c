@@ -288,10 +288,15 @@ static int fs_sink_process(const struct device *dev, struct net_buf *buf)
 
 	if (written < 0) {
 		LOG_ERR("fs_write failed: %zd", written);
+		fs_close(&data->current_file);
+		data->file_opened = false;
 		return (int)written;
 	}
 
 	data->current_file_size += written;
+
+	/* Sync file entry so file size is visible if power is lost. */
+	fs_sync(&data->current_file);
 
 	return 0;
 }
