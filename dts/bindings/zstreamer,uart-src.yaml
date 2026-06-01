@@ -14,11 +14,3 @@ properties:
     type: phandle
     required: true
     description: Phandle to the UART device to read from.
-  message-size:
-    type: int
-    default: 0
-    description: |
-      Expected message size in bytes. When set (> 0), the source
-      accumulates bytes until this many have been received before
-      dispatching the buffer. A 50 ms timeout prevents indefinite
-      blocking if the full message never arrives.

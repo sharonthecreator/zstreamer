@@ -26,7 +26,6 @@ LOG_MODULE_REGISTER(uart_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 struct uart_src_config {
 	struct zstreamer_source_config common;
 	const struct device *uart_dev;
-	uint16_t message_size;
 };
 
 struct uart_src_data {
@@ -102,11 +101,7 @@ static int uart_src_process_poll(const struct device *dev, struct net_buf *buf)
 {
 	const struct uart_src_config *cfg = dev->config;
 	unsigned char c;
-	uint16_t target = cfg->message_size;
-
-	if (target == 0 || target > net_buf_tailroom(buf)) {
-		target = net_buf_tailroom(buf);
-	}
+	uint16_t target = net_buf_tailroom(buf);
 
 	/* Clear any UART error flags (overrun, framing, etc.) before polling.
 	 * On STM32WL55 the UART can enter a broken state after LoRa TX;
@@ -194,7 +189,6 @@ static int uart_src_init(const struct device *dev)
 	static const struct uart_src_config uart_src_config_##inst = {                             \
 		.common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),                                      \
 		.uart_dev = DEVICE_DT_GET(DT_INST_PHANDLE(inst, uart_device)),                     \
-		.message_size = DT_INST_PROP_OR(inst, message_size, 0),                            \
 	};                                                                                         \
 	DEVICE_DT_INST_DEFINE(inst, uart_src_init, NULL, &uart_src_data_##inst,                    \
 			      &uart_src_config_##inst, POST_KERNEL,                                \
