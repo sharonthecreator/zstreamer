@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <errno.h>
+
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -43,7 +45,10 @@ void zstreamer_source_thread_entry(void *p1, void *p2, void *p3)
 
 			if (ret != 0) {
 				net_buf_unref(buf);
-				LOG_ERR("[%s] generate failed: %d", dev->name, ret);
+				if (ret != -EAGAIN) {
+					LOG_ERR("[%s] generate failed: %d",
+						dev->name, ret);
+				}
 				continue;
 			}
 

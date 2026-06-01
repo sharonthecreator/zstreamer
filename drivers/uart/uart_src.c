@@ -26,6 +26,7 @@ LOG_MODULE_REGISTER(uart_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 struct uart_src_config {
 	struct zstreamer_source_config common;
 	const struct device *uart_dev;
+	uint16_t message_size;
 };
 
 struct uart_src_data {
@@ -101,16 +102,50 @@ static int uart_src_process_poll(const struct device *dev, struct net_buf *buf)
 {
 	const struct uart_src_config *cfg = dev->config;
 	unsigned char c;
+	uint16_t target = cfg->message_size;
 
-	while (net_buf_tailroom(buf) > 0) {
+	if (target == 0 || target > net_buf_tailroom(buf)) {
+		target = net_buf_tailroom(buf);
+	}
+
+	/* Clear any UART error flags (overrun, framing, etc.) before polling.
+	 * On STM32WL55 the UART can enter a broken state after LoRa TX;
+	 * reading the error register clears the flags and recovers the UART. */
+	int err_flags = uart_err_check(cfg->uart_dev);
+
+	if (err_flags) {
+		LOG_WRN("UART errors cleared: 0x%02x", err_flags);
+	}
+
+	/* Accumulate bytes until we reach the target message size.
+	 * Poll with k_busy_wait(50 us) between attempts to avoid UART overrun
+	 * (single-byte RX register, no FIFO in polling mode).
+	 * Allow up to 100 ms of idle time between bytes so that upstream
+	 * pipeline latency (gpio_pulse delays, poll_out gaps) does not cause
+	 * premature short reads. */
+	int idle_polls = 0;
+	const int max_idle = 2000; /* 2000 * 50 us = 100 ms */
+
+	while (buf->len < target) {
 		if (uart_poll_in(cfg->uart_dev, &c) < 0) {
-			break;
+			if (buf->len == 0) {
+				/* Nothing received yet — short sleep and retry. */
+				k_msleep(1);
+				return -EAGAIN;
+			}
+			idle_polls++;
+			if (idle_polls > max_idle) {
+				LOG_WRN("Short message: got %u/%u bytes", buf->len, target);
+				break;
+			}
+			k_busy_wait(50);
+			continue;
 		}
+		idle_polls = 0;
 		net_buf_add_u8(buf, c);
 	}
 
 	if (buf->len == 0) {
-		k_msleep(1);
 		return -EAGAIN;
 	}
 
@@ -159,6 +194,7 @@ static int uart_src_init(const struct device *dev)
 	static const struct uart_src_config uart_src_config_##inst = {                             \
 		.common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),                                      \
 		.uart_dev = DEVICE_DT_GET(DT_INST_PHANDLE(inst, uart_device)),                     \
+		.message_size = DT_INST_PROP_OR(inst, message_size, 0),                            \
 	};                                                                                         \
 	DEVICE_DT_INST_DEFINE(inst, uart_src_init, NULL, &uart_src_data_##inst,                    \
 			      &uart_src_config_##inst, POST_KERNEL,                                \

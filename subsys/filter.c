@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <errno.h>
+
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -47,7 +49,10 @@ void zstreamer_filter_thread_entry(void *p1, void *p2, void *p3)
 		int result = api->process(dev, buf);
 
 		if (result < 0) {
-			LOG_ERR("[%s] filter error: %d", dev->name, result);
+			if (result != -EAGAIN) {
+				LOG_ERR("[%s] filter error: %d", dev->name,
+					result);
+			}
 			net_buf_unref(buf);
 		} else if (result > 0) {
 			zstreamer_node_distribute(dev, buf, cfg->common.children,
