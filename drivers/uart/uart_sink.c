@@ -95,6 +95,9 @@ static int uart_sink_process_poll(const struct device *dev, struct net_buf *buf)
 
 static int uart_sink_process(const struct device *dev, struct net_buf *buf)
 {
+	LOG_DBG("uart_sink TX %u bytes", buf->len);
+	LOG_HEXDUMP_DBG(buf->data, buf->len, "uart_sink TX data");
+
 #if defined(CONFIG_UART_ASYNC_API)
 	struct uart_sink_data *data = dev->data;
 

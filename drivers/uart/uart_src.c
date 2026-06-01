@@ -23,6 +23,10 @@ LOG_MODULE_REGISTER(uart_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 #endif
 #endif
 
+#if defined(CONFIG_UART_INTERRUPT_DRIVEN)
+#define UART_SRC_IRQ_BUF_SIZE 32
+#endif
+
 struct uart_src_config {
 	struct zstreamer_source_config common;
 	const struct device *uart_dev;
@@ -36,6 +40,12 @@ struct uart_src_data {
 	const uint8_t *rx_data;
 	size_t rx_len;
 	bool dma_enabled;
+#endif
+#if defined(CONFIG_UART_INTERRUPT_DRIVEN)
+	uint8_t irq_buf[UART_SRC_IRQ_BUF_SIZE];
+	volatile uint8_t irq_len;
+	struct k_sem irq_sem;
+	bool irq_enabled;
 #endif
 };
 
@@ -97,6 +107,109 @@ static int uart_src_process_dma(const struct device *dev, struct net_buf *buf)
 
 #endif /* CONFIG_UART_ASYNC_API */
 
+#if defined(CONFIG_UART_INTERRUPT_DRIVEN)
+
+static void uart_src_irq_handler(const struct device *uart_dev, void *user_data)
+{
+	struct uart_src_data *data = user_data;
+
+	/* Clear error flags (ORE/FE/NE/PE) before checking RXNE.
+	 * RXNEIE triggers interrupts on ORE too — uncleared ORE
+	 * causes an infinite ISR loop. */
+	uart_err_check(uart_dev);
+	uart_irq_update(uart_dev);
+
+	if (!uart_irq_rx_ready(uart_dev)) {
+		return;
+	}
+
+	int space = UART_SRC_IRQ_BUF_SIZE - data->irq_len;
+
+	if (space > 0) {
+		int n = uart_fifo_read(uart_dev, data->irq_buf + data->irq_len, space);
+
+		if (n > 0) {
+			data->irq_len += n;
+			k_sem_give(&data->irq_sem);
+		}
+	} else {
+		/* Buffer full — drain to prevent UART overrun. */
+		uint8_t discard;
+
+		while (uart_fifo_read(uart_dev, &discard, 1) > 0) {
+		}
+		LOG_WRN("IRQ buffer overflow, bytes discarded");
+	}
+}
+
+static int uart_src_open_irq(const struct device *dev)
+{
+	const struct uart_src_config *cfg = dev->config;
+	struct uart_src_data *data = dev->data;
+
+	k_sem_init(&data->irq_sem, 0, 1);
+	uart_irq_callback_user_data_set(cfg->uart_dev, uart_src_irq_handler, data);
+	uart_irq_rx_enable(cfg->uart_dev);
+	data->irq_enabled = true;
+
+	LOG_INF("IRQ RX enabled for %s", cfg->uart_dev->name);
+	return 0;
+}
+
+static int uart_src_process_irq(const struct device *dev, struct net_buf *buf)
+{
+	struct uart_src_data *data = dev->data;
+	uint16_t target = net_buf_tailroom(buf);
+
+	/* Block until at least one byte is buffered by the ISR. */
+	if (data->irq_len == 0) {
+		if (k_sem_take(&data->irq_sem, K_MSEC(100)) != 0) {
+			return -EAGAIN;
+		}
+	}
+
+	/* Wait for target bytes with inter-byte timeout (100 ms). */
+	int idle_polls = 0;
+	const int max_idle = 2000; /* 2000 * 50 us = 100 ms */
+
+	while (data->irq_len < target) {
+		k_busy_wait(50);
+		if (++idle_polls > max_idle) {
+			break;
+		}
+	}
+
+	/* Copy buffered bytes to net_buf under IRQ lock. */
+	unsigned int key = irq_lock();
+	size_t len = MIN(data->irq_len, net_buf_tailroom(buf));
+
+	if (len > 0) {
+		net_buf_add_mem(buf, data->irq_buf, len);
+		/* Shift any remaining bytes forward. */
+		if (data->irq_len > len) {
+			memmove(data->irq_buf, data->irq_buf + len, data->irq_len - len);
+		}
+		data->irq_len -= len;
+	}
+	k_sem_reset(&data->irq_sem);
+	if (data->irq_len > 0) {
+		k_sem_give(&data->irq_sem);
+	}
+	irq_unlock(key);
+
+	if (len == 0) {
+		return -EAGAIN;
+	}
+
+	if (len < target) {
+		LOG_WRN("Short message: got %zu/%u bytes", len, target);
+	}
+
+	return 0;
+}
+
+#endif /* CONFIG_UART_INTERRUPT_DRIVEN */
+
 static int uart_src_process_poll(const struct device *dev, struct net_buf *buf)
 {
 	const struct uart_src_config *cfg = dev->config;
@@ -149,14 +262,31 @@ static int uart_src_process_poll(const struct device *dev, struct net_buf *buf)
 
 static int uart_src_process(const struct device *dev, struct net_buf *buf)
 {
-#if defined(CONFIG_UART_ASYNC_API)
 	struct uart_src_data *data = dev->data;
+	int ret;
 
+	ARG_UNUSED(data);
+
+#if defined(CONFIG_UART_ASYNC_API)
 	if (data->dma_enabled) {
-		return uart_src_process_dma(dev, buf);
-	}
+		ret = uart_src_process_dma(dev, buf);
+	} else
 #endif
-	return uart_src_process_poll(dev, buf);
+#if defined(CONFIG_UART_INTERRUPT_DRIVEN)
+	if (data->irq_enabled) {
+		ret = uart_src_process_irq(dev, buf);
+	} else
+#endif
+	{
+		ret = uart_src_process_poll(dev, buf);
+	}
+
+	if (ret == 0 && buf->len > 0) {
+		LOG_DBG("uart_src RX %u bytes", buf->len);
+		LOG_HEXDUMP_DBG(buf->data, buf->len, "uart_src RX data");
+	}
+
+	return ret;
 }
 
 static const struct zstreamer_node_driver_api uart_src_api = {
@@ -165,19 +295,36 @@ static const struct zstreamer_node_driver_api uart_src_api = {
 
 static int uart_src_init(const struct device *dev)
 {
-#if defined(CONFIG_UART_ASYNC_API)
 	const struct uart_src_config *cfg = dev->config;
-	struct uart_src_data *data = dev->data;
-	int ret;
+	bool opened = false;
 
-	k_sem_init(&data->rx_sem, 0, 1);
+#if defined(CONFIG_UART_ASYNC_API)
+	{
+		struct uart_src_data *data = dev->data;
 
-	/* Try to enable DMA, fall back to polling if it fails. */
-	ret = uart_src_open_dma(dev);
-	if (ret != 0) {
-		LOG_INF("DMA not available for %s, using polling", cfg->uart_dev->name);
+		k_sem_init(&data->rx_sem, 0, 1);
+
+		/* Try to enable DMA first. */
+		if (uart_src_open_dma(dev) == 0) {
+			opened = true;
+		} else {
+			LOG_INF("DMA not available for %s", cfg->uart_dev->name);
+		}
 	}
 #endif
+#if defined(CONFIG_UART_INTERRUPT_DRIVEN)
+	if (!opened) {
+		if (uart_src_open_irq(dev) == 0) {
+			opened = true;
+		} else {
+			LOG_WRN("IRQ RX setup failed for %s", cfg->uart_dev->name);
+		}
+	}
+#endif
+	if (!opened) {
+		LOG_INF("%s: using polling mode", cfg->uart_dev->name);
+	}
+
 	return zstreamer_source_common_init(dev);
 }
 
