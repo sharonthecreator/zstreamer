@@ -80,10 +80,13 @@ static int lora_src_process(const struct device *dev, struct net_buf *buf)
 		return len;
 	}
 
-	if (len > 0) {
-		memcpy(net_buf_add(buf, len), data->rx_buf, len);
-		LOG_DBG("RX %d bytes, RSSI %d dBm, SNR %d dB", len, rssi, snr);
+	if (len == 0) {
+		LOG_DBG("RX zero-length packet, dropping");
+		return -EAGAIN;
 	}
+
+	memcpy(net_buf_add(buf, len), data->rx_buf, len);
+	LOG_DBG("RX %d bytes, RSSI %d dBm, SNR %d dB", len, rssi, snr);
 
 	return 0;
 }
