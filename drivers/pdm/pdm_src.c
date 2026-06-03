@@ -2,14 +2,16 @@
  * Copyright (c) 2026 sharonthecreator
  * SPDX-License-Identifier: Apache-2.0
  *
- * SAI-based PDM microphone source with CIC decimation.
+ * ADF-based PDM microphone source with hardware CIC decimation.
  *
- * Configures STM32 SAI Block A in PDM master-receiver mode.  The SAI
- * generates the PDM bit-clock on CK1 and captures the 1-bit PDM
- * bitstream from D1.  GPDMA transfers raw PDM words in circular mode
- * to a double buffer.  The source thread wakes on half-transfer /
- * transfer-complete, runs a fourth-order CIC decimation filter, and
- * outputs signed int16 PCM samples into the zstreamer pipeline.
+ * Configures the STM32U5 Audio Digital Filter (ADF1) to receive a PDM
+ * bitstream via its serial interface (SITF0) on ADF1_SDI0, clock the
+ * microphone from ADF1_CCK0, and decimate with a hardware Sinc4 CIC
+ * filter (DFLT0).  GPDMA transfers decimated 16-bit PCM samples from
+ * the upper half of the DFLT0 data register in circular mode to a
+ * double buffer.  The source thread wakes on half-transfer /
+ * transfer-complete and forwards the buffer into the zstreamer pipeline
+ * with zero CPU math.
  */
 
 #include <soc.h>
@@ -30,9 +32,6 @@ LOG_MODULE_REGISTER(pdm_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 
 #define DT_DRV_COMPAT zstreamer_pdm_src
 
-/* CIC decimation filter order.  4 is standard for PDM-to-PCM. */
-#define CIC_ORDER 4
-
 /* Number of PCM samples per half-buffer.  Each sample is int16_t.
  * Half-buffer byte size equals the graph buffer-size so that one
  * process() call fills exactly one net_buf.
@@ -40,34 +39,26 @@ LOG_MODULE_REGISTER(pdm_src, CONFIG_ZSTREAMER_LOG_LEVEL);
 #define HALF_PCM_SAMPLES(inst)                                                 \
   (DT_PROP(DT_PARENT(DT_DRV_INST(inst)), buffer_size) / sizeof(int16_t))
 
+/* Total int16 samples in the double buffer (two halves). */
+#define TOTAL_PCM_SAMPLES(inst) (HALF_PCM_SAMPLES(inst) * 2)
+
 /* Decimation ratio = PDM clock / PCM sample rate. */
 #define DECIMATION_RATIO(inst)                                                 \
   (DT_INST_PROP(inst, pdm_clk_freq_hz) / DT_INST_PROP(inst, sample_rate_hz))
-
-/* PDM bits are packed into 16-bit DMA words. */
-#define BITS_PER_WORD 16
-
-/* Number of 16-bit PDM words per half-buffer. */
-#define HALF_PDM_WORDS(inst)                                                   \
-  ((HALF_PCM_SAMPLES(inst) * DECIMATION_RATIO(inst)) / BITS_PER_WORD)
-
-#define TOTAL_PDM_WORDS(inst) (HALF_PDM_WORDS(inst) * 2)
 
 /* ── Structures ──────────────────────────────────────────────────── */
 
 struct pdm_src_config {
   struct zstreamer_source_config common;
-  SAI_Block_TypeDef *sai_block;
-  SAI_TypeDef *sai_global;
-  struct stm32_pclken sai_pclken;
-  struct stm32_pclken sai_pclken_src;
+  struct stm32_pclken adf_pclken;
+  struct stm32_pclken adf_pclken_src;
   const struct device *dma_dev;
   uint32_t dma_channel;
   uint32_t dma_slot;
   uint32_t sample_rate_hz;
   uint32_t pdm_clk_freq_hz;
   bool right_channel;
-  uint16_t half_pdm_words;
+  uint16_t half_pcm_samples;
   uint16_t decimation_ratio;
   uint16_t warmup_buffers;
   const struct pinctrl_dev_config *pcfg;
@@ -77,15 +68,10 @@ struct pdm_src_data {
   struct zstreamer_source_data common;
   struct k_sem half_ready;
   volatile uint8_t ready_half;
-  uint16_t *dma_buf;
+  int16_t *dma_buf;
   struct dma_config dma_cfg;
   struct dma_block_config dma_blk;
-  /* CIC filter state (persists across process() calls). */
-  int64_t integrators[CIC_ORDER];
-  int64_t comb_delay[CIC_ORDER];
-  uint16_t decimation_counter;
   uint16_t warmup_remaining;
-  uint8_t cic_shift;
 };
 
 /* ── DMA callback (ISR context) ──────────────────────────────────── */
@@ -103,24 +89,6 @@ static void pdm_src_dma_cb(const struct device *dma_dev, void *user_data,
   }
 }
 
-/* ── CIC shift computation ──────────────────────────────────────── */
-
-static uint8_t compute_cic_shift(uint32_t decimation_ratio) {
-  /* CIC gain = R^M.  Compute ceil(log2(R)) * M - 15 to scale output
-   * into the int16 range.
-   */
-  uint8_t log2_r = 0;
-  uint32_t r = decimation_ratio - 1;
-
-  while (r > 0) {
-    log2_r++;
-    r >>= 1;
-  }
-
-  int shift = CIC_ORDER * log2_r - 15;
-  return (shift > 0) ? (uint8_t)shift : 0;
-}
-
 /* ── Source process (called in source thread loop) ────────────────── */
 
 static int pdm_src_process(const struct device *dev, struct net_buf *buf) {
@@ -132,143 +100,156 @@ static int pdm_src_process(const struct device *dev, struct net_buf *buf) {
     return -EAGAIN;
   }
 
-  /* Discard initial buffers while the PDM microphone settles.
-   * Most MEMS PDM mics need up to 200 ms wake-up time after power-on;
-   * during this period the output is invalid.
-   */
+  /* Discard initial buffers while the PDM microphone settles. */
   if (data->warmup_remaining > 0) {
     data->warmup_remaining--;
     return -EAGAIN;
   }
 
-  uint16_t *src = &data->dma_buf[data->ready_half * cfg->half_pdm_words];
-  size_t half_bytes = cfg->half_pdm_words * sizeof(uint16_t);
+  int16_t *src = &data->dma_buf[data->ready_half * cfg->half_pcm_samples];
+  size_t half_bytes = cfg->half_pcm_samples * sizeof(int16_t);
 
   sys_cache_data_invd_range(src, half_bytes);
 
-  uint16_t half_pcm =
-      cfg->half_pdm_words * BITS_PER_WORD / cfg->decimation_ratio;
-  int16_t *dst = (int16_t *)net_buf_add(buf, half_pcm * sizeof(int16_t));
-  uint16_t pcm_idx = 0;
-
-  for (uint16_t w = 0; w < cfg->half_pdm_words; w++) {
-    uint16_t word = src[w];
-
-    /* Process MSB first (bit 15 = earliest clock cycle). */
-    for (int bit = BITS_PER_WORD - 1; bit >= 0; bit--) {
-      int64_t x = ((word >> bit) & 1) ? 1 : -1;
-
-      /* Integrator cascade. */
-      data->integrators[0] += x;
-      for (int k = 1; k < CIC_ORDER; k++) {
-        data->integrators[k] += data->integrators[k - 1];
-      }
-
-      data->decimation_counter++;
-      if (data->decimation_counter >= cfg->decimation_ratio) {
-        data->decimation_counter = 0;
-
-        /* Comb cascade. */
-        int64_t val = data->integrators[CIC_ORDER - 1];
-        for (int k = 0; k < CIC_ORDER; k++) {
-          int64_t prev = data->comb_delay[k];
-          data->comb_delay[k] = val;
-          val -= prev;
-        }
-
-        if (pcm_idx < half_pcm) {
-          dst[pcm_idx++] = (int16_t)(val >> data->cic_shift);
-        }
-      }
-    }
-  }
+  /* DMA already produced int16 PCM — just copy into net_buf. */
+  net_buf_add_mem(buf, src, half_bytes);
 
   return 0;
 }
 
-/* ── SAI clock setup ─────────────────────────────────────────────── */
+/* ── ADF clock setup ─────────────────────────────────────────────── */
 
 static int pdm_src_clock_init(const struct pdm_src_config *cfg,
-                              uint32_t *sai_ker_clk) {
+                              uint32_t *adf_ker_clk) {
   const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
   int ret;
 
-  ret = clock_control_on(clk, (clock_control_subsys_t)&cfg->sai_pclken);
+  /* Enable ADF1 bus clock on AHB3. */
+  ret = clock_control_on(clk, (clock_control_subsys_t)&cfg->adf_pclken);
   if (ret < 0) {
-    LOG_ERR("Failed to enable SAI bus clock: %d", ret);
+    LOG_ERR("Failed to enable ADF1 bus clock: %d", ret);
     return ret;
   }
 
+  /* Select ADF1 kernel clock source. */
   ret = clock_control_configure(
-      clk, (clock_control_subsys_t)&cfg->sai_pclken_src, NULL);
+      clk, (clock_control_subsys_t)&cfg->adf_pclken_src, NULL);
   if (ret < 0) {
-    LOG_ERR("Failed to select SAI kernel clock: %d", ret);
+    LOG_ERR("Failed to select ADF1 kernel clock: %d", ret);
     return ret;
   }
 
+  /* Read back the actual kernel clock rate. */
   ret = clock_control_get_rate(
-      clk, (clock_control_subsys_t)&cfg->sai_pclken_src, sai_ker_clk);
+      clk, (clock_control_subsys_t)&cfg->adf_pclken_src, adf_ker_clk);
   if (ret < 0) {
-    LOG_ERR("Failed to get SAI kernel clock rate: %d", ret);
+    LOG_ERR("Failed to get ADF1 kernel clock rate: %d", ret);
     return ret;
   }
 
   return 0;
 }
 
-/* ── SAI PDM register setup ──────────────────────────────────────── */
+/* ── ADF hardware register setup ─────────────────────────────────── */
 
-static int pdm_src_sai_init(const struct pdm_src_config *cfg,
-                            uint32_t sai_ker_clk) {
-  SAI_Block_TypeDef *block = cfg->sai_block;
-  SAI_TypeDef *sai = cfg->sai_global;
+static int pdm_src_adf_init(const struct pdm_src_config *cfg,
+                            uint32_t adf_ker_clk) {
+  MDF_TypeDef *adf = ADF1;
+  MDF_Filter_TypeDef *flt = ADF1_Filter0;
 
-  /* Disable block before configuration. */
-  block->CR1 &= ~SAI_xCR1_SAIEN;
-  while (block->CR1 & SAI_xCR1_SAIEN) {
-  }
+  /* ── Disable filter and serial interface before configuration ─── */
+  flt->DFLTCR &= ~MDF_DFLTCR_DFLTEN;
+  flt->SITFCR &= ~MDF_SITFCR_SITFEN;
 
-  /* Flush FIFO. */
-  block->CR2 = SAI_xCR2_FFLUSH;
+  /* ── Clock generator ────────────────────────────────────────────
+   * PDM_CLK = adf_ker_clk / ((PROCDIV+1) * (CCKDIV+1))
+   *
+   * We want pdm_clk_freq_hz on CCK0.  Compute the total divider
+   * and factor it into PROCDIV and CCKDIV (PROCDIV max 127,
+   * CCKDIV max 15).
+   */
+  uint32_t total_div = adf_ker_clk / cfg->pdm_clk_freq_hz;
+  uint32_t procdiv, cckdiv;
 
-  /* Enable PDM mode with clock 1 output, 1 mic pair. */
-  sai->PDMCR = SAI_PDMCR_PDMEN | SAI_PDMCR_CKEN1;
-  sai->PDMDLY = 0;
-
-  /* Compute MCKDIV: PDM_CLK = SAI_CK / (MCKDIV * 2). */
-  uint32_t mckdiv = sai_ker_clk / (cfg->pdm_clk_freq_hz * 2);
-  uint32_t actual_pdm_clk = sai_ker_clk / (mckdiv * 2);
-
-  if (mckdiv == 0 || mckdiv > 63) {
-    LOG_ERR("MCKDIV out of range: %u (sai_clk=%u, pdm_clk=%u)", mckdiv,
-            sai_ker_clk, cfg->pdm_clk_freq_hz);
+  if (total_div == 0) {
+    LOG_ERR("ADF kernel clock %u too low for pdm_clk %u", adf_ker_clk,
+            cfg->pdm_clk_freq_hz);
     return -EINVAL;
   }
 
-  /* CR1: Master RX, free protocol, 16-bit data, mono, NODIV.
-   * NODIV is required in PDM mode so that the internal bit-clock (SCK)
-   * runs at the same rate as MCLK (the PDM clock output on CK1).
-   * Without NODIV the SAI inserts an extra 256/(FRL+1) divider between
-   * MCLK and SCK, under-sampling the PDM bitstream.
+  /* Try CCKDIV=0 first (no extra division on CCK output). */
+  if (total_div <= 128) {
+    procdiv = total_div - 1;
+    cckdiv = 0;
+  } else {
+    /* Factor total_div = (procdiv+1) * (cckdiv+1).
+     * Pick cckdiv to keep procdiv in range [0..127].
+     */
+    cckdiv = (total_div + 127) / 128 - 1;
+    if (cckdiv > 15) {
+      LOG_ERR("Cannot reach pdm_clk %u from ker_clk %u", cfg->pdm_clk_freq_hz,
+              adf_ker_clk);
+      return -EINVAL;
+    }
+    procdiv = total_div / (cckdiv + 1) - 1;
+  }
+
+  uint32_t actual_pdm_clk = adf_ker_clk / ((procdiv + 1) * (cckdiv + 1));
+
+  /* CKGCR: enable clock dividers, enable CCK0 output, CCK0 direction
+   * output, normal mode (not trigger-based).
    */
-  block->CR1 = SAI_xCR1_MODE_0           /* Master RX (0b01) */
-               | (4U << SAI_xCR1_DS_Pos) /* 16-bit data (0b100) */
-               | SAI_xCR1_MONO           /* Mono mode */
-               | SAI_xCR1_NODIV          /* SCK = MCLK for PDM */
-               | (mckdiv << SAI_xCR1_MCKDIV_Pos) |
-               (cfg->right_channel ? SAI_xCR1_CKSTR : 0) | SAI_xCR1_DMAEN;
+  adf->CKGCR = MDF_CKGCR_CKDEN | MDF_CKGCR_CCK0EN | MDF_CKGCR_CCK0DIR |
+               (cckdiv << MDF_CKGCR_CCKDIV_Pos) |
+               (procdiv << MDF_CKGCR_PROCDIV_Pos);
 
-  /* CR2: FIFO threshold = 1/4 full. */
-  block->CR2 = SAI_xCR2_FTH_0;
+  /* Wait for clock generator to become active. */
+  uint32_t timeout = 10000;
+  while (!(adf->CKGCR & MDF_CKGCR_CCKACTIVE) && timeout > 0) {
+    timeout--;
+  }
+  if (timeout == 0) {
+    LOG_ERR("ADF clock generator did not become active");
+    return -ETIMEDOUT;
+  }
 
-  /* Frame: 16 bits total, frame sync active for 1 bit. */
-  block->FRCR = (15U << SAI_xFRCR_FRL_Pos) | SAI_xFRCR_FSDEF;
+  /* ── Serial interface (SITF0) ───────────────────────────────────
+   * Normal SPI mode (SITFMOD=01), clock from CCK0 (SCKSRC=00).
+   */
+  flt->SITFCR = MDF_SITFCR_SITFMOD_0; /* Normal SPI, CCK0 source */
 
-  /* Slot: 1 slot of 16 bits, slot 0 active. */
-  block->SLOTR = (1U << SAI_xSLOTR_SLOTEN_Pos) | SAI_xSLOTR_SLOTSZ_0;
+  /* ── Bitstream matrix ───────────────────────────────────────────
+   * Route SITF0 to DFLT0.  For ADF, BSSEL selects the bitstream:
+   *   0 = sitf0_fl (falling-edge / left channel)
+   *   1 = sitf0_fr (rising-edge / right channel)
+   */
+  flt->BSMXCR = cfg->right_channel ? 1U : 0U;
 
-  LOG_INF("SAI PDM: ker_clk=%u mckdiv=%u -> pdm_clk=%u Hz (target %u)",
-          sai_ker_clk, mckdiv, actual_pdm_clk, cfg->pdm_clk_freq_hz);
+  /* ── CIC filter configuration ───────────────────────────────────
+   * Sinc4 mode (CICMOD=100), data from BSMX (DATSRC=00).
+   * Decimation ratio = pdm_clk / sample_rate, register = ratio - 1.
+   * SCALE = 0 (default gain, adjust if needed).
+   */
+  uint32_t mcicd = cfg->decimation_ratio - 1;
+  flt->DFLTCICR = MDF_DFLTCICR_CICMOD_2 | /* Sinc4 */
+                  (mcicd << MDF_DFLTCICR_MCICD_Pos) |
+                  (0U << MDF_DFLTCICR_SCALE_Pos);
+
+  /* Bypass reshape filter (not needed for basic PDM-to-PCM). */
+  flt->DFLTRSFR = MDF_DFLTRSFR_RSFLTBYP;
+
+  /* ── Digital filter control ─────────────────────────────────────
+   * Enable filter, enable DMA, continuous acquisition (ACQMOD=0).
+   */
+  flt->DFLTCR = MDF_DFLTCR_DFLTEN | MDF_DFLTCR_DMAEN;
+
+  /* ── Enable serial interface ────────────────────────────────────  */
+  flt->SITFCR |= MDF_SITFCR_SITFEN;
+
+  LOG_INF("ADF PDM: ker_clk=%u procdiv=%u cckdiv=%u -> pdm_clk=%u Hz "
+          "(target %u), decimation=%u",
+          adf_ker_clk, procdiv, cckdiv, actual_pdm_clk, cfg->pdm_clk_freq_hz,
+          cfg->decimation_ratio);
 
   return 0;
 }
@@ -278,12 +259,18 @@ static int pdm_src_sai_init(const struct pdm_src_config *cfg,
 static int pdm_src_dma_init(const struct device *dev) {
   const struct pdm_src_config *cfg = dev->config;
   struct pdm_src_data *data = dev->data;
-  uint32_t sai_dr_addr = (uint32_t)&cfg->sai_block->DR;
+
+  /* DMA reads from the upper 16 bits of DFLTDR (MSB-only mode).
+   * DFLTDR bits [31:8] hold 24-bit signed data; reading at offset +2
+   * yields the upper 16 bits as a signed int16, which is our PCM
+   * sample with no further conversion needed.
+   */
+  uint32_t dfltdr_msb_addr = (uint32_t)&ADF1_Filter0->DFLTDR + 2U;
 
   memset(&data->dma_blk, 0, sizeof(data->dma_blk));
-  data->dma_blk.source_address = sai_dr_addr;
+  data->dma_blk.source_address = dfltdr_msb_addr;
   data->dma_blk.dest_address = (uint32_t)data->dma_buf;
-  data->dma_blk.block_size = cfg->half_pdm_words * 2 * sizeof(uint16_t);
+  data->dma_blk.block_size = cfg->half_pcm_samples * 2 * sizeof(int16_t);
   data->dma_blk.source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
   data->dma_blk.dest_addr_adj = DMA_ADDR_ADJ_INCREMENT;
   data->dma_blk.source_reload_en = 1;
@@ -294,8 +281,8 @@ static int pdm_src_dma_init(const struct device *dev) {
   data->dma_cfg.channel_direction = PERIPHERAL_TO_MEMORY;
   data->dma_cfg.source_data_size = 2; /* 16-bit */
   data->dma_cfg.dest_data_size = 2;
-  data->dma_cfg.source_burst_length = 2;
-  data->dma_cfg.dest_burst_length = 2;
+  data->dma_cfg.source_burst_length = 1;
+  data->dma_cfg.dest_burst_length = 1;
   data->dma_cfg.dma_callback = pdm_src_dma_cb;
   data->dma_cfg.user_data = data;
   data->dma_cfg.head_block = &data->dma_blk;
@@ -311,7 +298,7 @@ static int pdm_src_dma_init(const struct device *dev) {
   return 0;
 }
 
-/* ── Start: DMA → SAI enable ─────────────────────────────────────── */
+/* ── Start: DMA → ADF enable ─────────────────────────────────────── */
 
 static int pdm_src_hw_start(const struct device *dev) {
   const struct pdm_src_config *cfg = dev->config;
@@ -322,10 +309,8 @@ static int pdm_src_hw_start(const struct device *dev) {
     return ret;
   }
 
-  cfg->sai_block->CR1 |= SAI_xCR1_SAIEN;
-
-  LOG_INF("PDM source started (decimation=%u, cic_shift=%u)",
-          cfg->decimation_ratio, ((struct pdm_src_data *)dev->data)->cic_shift);
+  LOG_INF("PDM source started (ADF1 hw CIC, decimation=%u)",
+          cfg->decimation_ratio);
   return 0;
 }
 
@@ -337,11 +322,7 @@ static int pdm_src_init(const struct device *dev) {
   int ret;
 
   k_sem_init(&data->half_ready, 0, 1);
-  memset(data->integrators, 0, sizeof(data->integrators));
-  memset(data->comb_delay, 0, sizeof(data->comb_delay));
-  data->decimation_counter = 0;
   data->warmup_remaining = cfg->warmup_buffers;
-  data->cic_shift = compute_cic_shift(cfg->decimation_ratio);
 
   ret = pinctrl_apply_state(cfg->pcfg, PINCTRL_STATE_DEFAULT);
   if (ret < 0) {
@@ -349,14 +330,14 @@ static int pdm_src_init(const struct device *dev) {
     return ret;
   }
 
-  uint32_t sai_ker_clk;
+  uint32_t adf_ker_clk;
 
-  ret = pdm_src_clock_init(cfg, &sai_ker_clk);
+  ret = pdm_src_clock_init(cfg, &adf_ker_clk);
   if (ret < 0) {
     return ret;
   }
 
-  ret = pdm_src_sai_init(cfg, sai_ker_clk);
+  ret = pdm_src_adf_init(cfg, adf_ker_clk);
   if (ret < 0) {
     return ret;
   }
@@ -380,23 +361,22 @@ static const struct zstreamer_node_driver_api pdm_src_api = {
 
 /* ── Instance macros ─────────────────────────────────────────────── */
 
-/* SAI global (SAI_TypeDef) is 4 bytes before Block A (SAI_Block_TypeDef). */
-#define SAI_BLOCK_REG(inst)                                                    \
-  ((SAI_Block_TypeDef *)DT_REG_ADDR(DT_INST_PHANDLE(inst, sai)))
-
-#define SAI_GLOBAL_REG(inst)                                                   \
-  ((SAI_TypeDef *)(DT_REG_ADDR(DT_INST_PHANDLE(inst, sai)) - 0x04))
-
-#define SAI_PCLKEN(inst)                                                       \
+/* ADF1 bus clock: AHB3, bit 10 (RCC_AHB3ENR_ADF1EN). */
+#define ADF_PCLKEN(inst)                                                       \
   {                                                                            \
-      .bus = DT_CLOCKS_CELL_BY_IDX(DT_INST_PHANDLE(inst, sai), 0, bus),        \
-      .enr = DT_CLOCKS_CELL_BY_IDX(DT_INST_PHANDLE(inst, sai), 0, bits),       \
+      .bus = STM32_CLOCK_BUS_AHB3,                                             \
+      .enr = RCC_AHB3ENR_ADF1EN_Pos,                                           \
   }
 
-#define SAI_PCLKEN_SRC(inst)                                                   \
+/* ADF1 kernel clock source: read from the second ``clocks`` entry in
+ * the devicetree node.  The overlay must supply two clock cells:
+ *   clocks = <&rcc STM32_CLOCK(AHB3, 10)>,
+ *            <&rcc STM32_SRC_xxx ADF1_SEL(n)>;
+ */
+#define ADF_PCLKEN_SRC(inst)                                                   \
   {                                                                            \
-      .bus = DT_CLOCKS_CELL_BY_IDX(DT_INST_PHANDLE(inst, sai), 1, bus),        \
-      .enr = DT_CLOCKS_CELL_BY_IDX(DT_INST_PHANDLE(inst, sai), 1, bits),       \
+      .bus = DT_CLOCKS_CELL_BY_IDX(DT_DRV_INST(inst), 1, bus),                 \
+      .enr = DT_CLOCKS_CELL_BY_IDX(DT_DRV_INST(inst), 1, bits),                \
   }
 
 #define PDM_SRC_DEFINE(inst)                                                   \
@@ -406,17 +386,10 @@ static const struct zstreamer_node_driver_api pdm_src_api = {
           0,                                                                   \
       "pdm-clk-freq-hz must be an integer multiple of sample-rate-hz");        \
                                                                                \
-  BUILD_ASSERT(DECIMATION_RATIO(inst) <= 215,                                  \
-               "decimation ratio too large for CIC order 4 with int64");       \
-                                                                               \
-  BUILD_ASSERT(HALF_PDM_WORDS(inst) * BITS_PER_WORD ==                         \
-                   HALF_PCM_SAMPLES(inst) * DECIMATION_RATIO(inst),            \
-               "half-buffer PDM bits must be exact multiple of 16");           \
-                                                                               \
   ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst);                                   \
   PINCTRL_DT_INST_DEFINE(inst);                                                \
                                                                                \
-  static uint16_t pdm_dma_buf_##inst[TOTAL_PDM_WORDS(inst)] __aligned(32)      \
+  static int16_t pdm_dma_buf_##inst[TOTAL_PCM_SAMPLES(inst)] __aligned(32)     \
       __attribute__((section(".noinit")));                                     \
                                                                                \
   static struct pdm_src_data pdm_src_data_##inst = {                           \
@@ -426,10 +399,8 @@ static const struct zstreamer_node_driver_api pdm_src_api = {
                                                                                \
   static const struct pdm_src_config pdm_src_config_##inst = {                 \
       .common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),                            \
-      .sai_block = SAI_BLOCK_REG(inst),                                        \
-      .sai_global = SAI_GLOBAL_REG(inst),                                      \
-      .sai_pclken = SAI_PCLKEN(inst),                                          \
-      .sai_pclken_src = SAI_PCLKEN_SRC(inst),                                  \
+      .adf_pclken = ADF_PCLKEN(inst),                                          \
+      .adf_pclken_src = ADF_PCLKEN_SRC(inst),                                  \
       .dma_dev = DEVICE_DT_GET(DT_INST_DMAS_CTLR_BY_NAME(inst, rx)),           \
       .dma_channel = DT_INST_DMAS_CELL_BY_NAME(inst, rx, channel),             \
       .dma_slot = DT_INST_DMAS_CELL_BY_NAME(inst, rx, slot),                   \
@@ -437,7 +408,7 @@ static const struct zstreamer_node_driver_api pdm_src_api = {
       .pdm_clk_freq_hz = DT_INST_PROP(inst, pdm_clk_freq_hz),                  \
       .right_channel = DT_INST_PROP(inst, right_channel),                      \
       .decimation_ratio = DECIMATION_RATIO(inst),                              \
-      .half_pdm_words = HALF_PDM_WORDS(inst),                                  \
+      .half_pcm_samples = HALF_PCM_SAMPLES(inst),                              \
       .warmup_buffers = DT_INST_PROP(inst, warmup_buffers),                    \
       .pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(inst),                            \
   };                                                                           \

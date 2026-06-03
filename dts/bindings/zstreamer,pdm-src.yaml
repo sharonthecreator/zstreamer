@@ -1,30 +1,27 @@
 description: |
-  SAI-based PDM microphone source with CIC decimation.
+  ADF-based PDM microphone source with hardware CIC decimation.
 
-  Configures an STM32 SAI block in PDM master-receiver mode to clock a
-  PDM microphone and capture its bitstream via DMA.  A fourth-order CIC
-  decimation filter converts the raw 1-bit PDM data to signed int16 PCM
-  samples that flow into the zstreamer pipeline.
+  Configures the STM32U5 Audio Digital Filter (ADF1) to receive a PDM
+  bitstream on ADF1_SDI0, clock the microphone from ADF1_CCK0, and
+  decimate with the hardware Sinc4 CIC filter (DFLT0).  GPDMA transfers
+  decimated signed int16 PCM samples from the DFLT0 data register into
+  the zstreamer pipeline.
 
-  The SAI block referenced by the ``sai`` phandle supplies the register
-  base and clock tree entries.  Do NOT duplicate ``clocks`` or ``reg``
-  here; they are read from that node automatically.  The SAI block does
-  not need ``status = "okay"`` -- this driver enables its clock
-  independently.
-
-  Pin configuration for the PDM clock output (CK1/CK2) and data input
-  (D1/D2/D3) must be provided via pinctrl on this node.
+  The node must supply two ``clocks`` entries: the ADF1 bus clock and
+  the ADF1 kernel clock source.  Pin configuration for ADF1_CCK0 (clock
+  output) and ADF1_SDI0 (data input) must be provided via pinctrl.
 
   Example (Nucleo-U5A5ZJ-Q, Knowles SPK0641HT4H-1)::
 
     pdm_source: pdm-source {
         compatible = "zstreamer,pdm-src";
-        sai = <&sai1_a>;
+        clocks = <&rcc STM32_CLOCK(AHB3, 10)>,
+                 <&rcc STM32_SRC_MSIK ADF1_SEL(4)>;
         sample-rate-hz = <16000>;
-        pdm-clk-freq-hz = <2048000>;
-        pinctrl-0 = <&sai1_ck1_pe2 &sai1_d1_pe6>;
+        pdm-clk-freq-hz = <2000000>;
+        pinctrl-0 = <&adf1_cck0_pf3 &adf1_sdi0_pf4>;
         pinctrl-names = "default";
-        dmas = <&gpdma1 2 36 (STM32_DMA_PERIPH_RX |
+        dmas = <&gpdma1 0 98 (STM32_DMA_PERIPH_RX |
                                 STM32_DMA_MEM_16BITS |
                                 STM32_DMA_PERIPH_16BITS)>;
         dma-names = "rx";
@@ -39,13 +36,15 @@ include:
   - pinctrl-device.yaml
 
 properties:
-  sai:
-    type: phandle
+  clocks:
+    type: phandle-array
     required: true
     description: |
-      SAI block device to use for PDM reception (e.g. <&sai1_a>).
-      Must be Block A (master-capable).  The driver reads ``clocks``
-      and ``reg`` from this node -- do not duplicate them here.
+      Two clock entries:
+        [0] ADF1 bus clock on AHB3 (e.g. <&rcc STM32_CLOCK(AHB3, 10)>).
+        [1] ADF1 kernel clock source (e.g. <&rcc STM32_SRC_MSIK ADF1_SEL(4)>).
+      The kernel clock feeds the ADF clock generator which produces the
+      PDM bit-clock on CCK0.
 
   sample-rate-hz:
     type: int
@@ -58,7 +57,7 @@ properties:
     type: int
     default: 2048000
     description: |
-      PDM bit-clock frequency in Hz output on the SAI CK1 pin.
+      PDM bit-clock frequency in Hz output on ADF1_CCK0.
       SPK0641HT4H-1 supports 1.0 -- 4.8 MHz.  Default 2.048 MHz
       gives a clean decimation ratio of 128 at 16 kHz PCM output.
 
@@ -73,9 +72,9 @@ properties:
     type: phandle-array
     required: true
     description: |
-      GPDMA channel for SAI RX.  Format:
-      <&gpdma1 channel request flags>.  The request slot for SAI1
-      Block A is 36 (LL_GPDMA1_REQUEST_SAI1_A).
+      GPDMA channel for ADF1 DFLT0 RX.  Format:
+      <&gpdma1 channel request flags>.  The request slot for
+      ADF1_FLT0 is 98 (GPDMA1_REQUEST_ADF1_FLT0).
 
   dma-names:
     type: string-array
@@ -87,7 +86,6 @@ properties:
     default: 0
     description: |
       Number of initial half-buffers to silently discard after DMA
-      starts.  PDM microphones and the CIC integrator chain need a
-      settling period; the first few buffers contain transient noise
-      that can trigger false detections downstream.  Set to 0 to
-      disable (default).
+      starts.  PDM microphones need a settling period; the first few
+      buffers contain transient noise that can trigger false detections
+      downstream.  Set to 0 to disable (default).

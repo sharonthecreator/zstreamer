@@ -13,6 +13,6 @@ config ZSTREAMER_PDM_SRC
 	depends on SOC_FAMILY_STM32
 	select ZSTREAMER_PDM
 	help
-	  Enable the SAI-based PDM microphone source streaming node.
-	  Configures an STM32 SAI in PDM master-receiver mode with DMA
-	  and fourth-order CIC decimation to produce signed int16 PCM.
+	  Enable the ADF-based PDM microphone source streaming node.
+	  Configures the STM32U5 ADF1 hardware CIC decimation filter
+	  with DMA to produce signed int16 PCM samples.
