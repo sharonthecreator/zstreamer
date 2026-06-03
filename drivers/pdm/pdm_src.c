@@ -86,6 +86,8 @@ static void pdm_src_dma_cb(const struct device *dma_dev, void *user_data,
   } else if (status == DMA_STATUS_COMPLETE) {
     data->ready_half = 1;
     k_sem_give(&data->half_ready);
+  } else {
+    LOG_WRN("DMA error status: %d", status);
   }
 }
 
@@ -219,11 +221,11 @@ static int pdm_src_adf_init(const struct pdm_src_config *cfg,
   flt->SITFCR = MDF_SITFCR_SITFMOD_0; /* Normal SPI, CCK0 source */
 
   /* ── Bitstream matrix ───────────────────────────────────────────
-   * Route SITF0 to DFLT0.  For ADF, BSSEL selects the bitstream:
-   *   0 = sitf0_fl (falling-edge / left channel)
-   *   1 = sitf0_fr (rising-edge / right channel)
+   * Route SITF0 to DFLT0.  BSSEL selects the bitstream edge:
+   *   0 = rising-edge data  (right channel, mic Select = VDD)
+   *   1 = falling-edge data (left channel, mic Select = GND)
    */
-  flt->BSMXCR = cfg->right_channel ? 1U : 0U;
+  flt->BSMXCR = cfg->right_channel ? 0U : 1U;
 
   /* ── CIC filter configuration ───────────────────────────────────
    * Sinc4 mode (CICMOD=100), data from BSMX (DATSRC=00).
@@ -239,9 +241,11 @@ static int pdm_src_adf_init(const struct pdm_src_config *cfg,
   flt->DFLTRSFR = MDF_DFLTRSFR_RSFLTBYP;
 
   /* ── Digital filter control ─────────────────────────────────────
-   * Enable filter, enable DMA, continuous acquisition (ACQMOD=0).
+   * Enable DMA requests but do NOT enable the filter yet.
+   * DFLTEN is set later in pdm_src_hw_start() after DMA is running,
+   * to avoid FIFO overflow from DMA requests before the channel is ready.
    */
-  flt->DFLTCR = MDF_DFLTCR_DFLTEN | MDF_DFLTCR_DMAEN;
+  flt->DFLTCR = MDF_DFLTCR_DMAEN;
 
   /* ── Enable serial interface ────────────────────────────────────  */
   flt->SITFCR |= MDF_SITFCR_SITFEN;
@@ -308,6 +312,9 @@ static int pdm_src_hw_start(const struct device *dev) {
     LOG_ERR("DMA start failed: %d", ret);
     return ret;
   }
+
+  /* Now that DMA is running, enable the digital filter. */
+  ADF1_Filter0->DFLTCR |= MDF_DFLTCR_DFLTEN;
 
   LOG_INF("PDM source started (ADF1 hw CIC, decimation=%u)",
           cfg->decimation_ratio);
