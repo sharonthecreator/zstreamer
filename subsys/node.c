@@ -81,7 +81,10 @@ void zstreamer_node_thread_entry(void *p1, void *p2, void *p3) {
     int ret = api->process(dev, buf);
 
     if (ret != 0) {
-      LOG_ERR("[%s] process error: %d", dev->name, ret);
+      /* Silent unrefing if the node decides to drop the buffer. */
+      if (ret != -EAGAIN) {
+        LOG_ERR("[%s] process error: %d", dev->name, ret);
+      }
       net_buf_unref(buf);
       continue;
     }

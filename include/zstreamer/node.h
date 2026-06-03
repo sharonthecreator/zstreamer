@@ -84,6 +84,7 @@ struct zstreamer_node_data {
  *                Return 0 on success, negative errno on error.
  *                Filter convention: 0 = false (route to false_children),
  *                1 = true (route to children), <0 = error.
+ *                If the error is -EAGAIN, the buffer is unrefed silently.
  */
 __subsystem struct zstreamer_node_driver_api {
   int (*process)(const struct device *dev, struct net_buf *buf);
