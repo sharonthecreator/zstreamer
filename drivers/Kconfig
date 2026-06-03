@@ -17,4 +17,6 @@ rsource "i2s/Kconfig"
 
 rsource "lora/Kconfig"
 
+rsource "pdm/Kconfig"
+
 rsource "test/Kconfig"

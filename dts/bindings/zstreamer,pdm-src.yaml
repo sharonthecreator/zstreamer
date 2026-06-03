@@ -1,0 +1,83 @@
+description: |
+  SAI-based PDM microphone source with CIC decimation.
+
+  Configures an STM32 SAI block in PDM master-receiver mode to clock a
+  PDM microphone and capture its bitstream via DMA.  A fourth-order CIC
+  decimation filter converts the raw 1-bit PDM data to signed int16 PCM
+  samples that flow into the zstreamer pipeline.
+
+  The SAI block referenced by the ``sai`` phandle supplies the register
+  base and clock tree entries.  Do NOT duplicate ``clocks`` or ``reg``
+  here; they are read from that node automatically.  The SAI block does
+  not need ``status = "okay"`` -- this driver enables its clock
+  independently.
+
+  Pin configuration for the PDM clock output (CK1/CK2) and data input
+  (D1/D2/D3) must be provided via pinctrl on this node.
+
+  Example (Nucleo-U5A5ZJ-Q, Knowles SPK0641HT4H-1)::
+
+    pdm_source: pdm-source {
+        compatible = "zstreamer,pdm-src";
+        sai = <&sai1_a>;
+        sample-rate-hz = <16000>;
+        pdm-clk-freq-hz = <2048000>;
+        pinctrl-0 = <&sai1_ck1_pe2 &sai1_d1_pe6>;
+        pinctrl-names = "default";
+        dmas = <&gpdma1 2 36 (STM32_DMA_PERIPH_RX |
+                                STM32_DMA_MEM_16BITS |
+                                STM32_DMA_PERIPH_16BITS)>;
+        dma-names = "rx";
+        children = <&some_filter>;
+        autostart;
+    };
+
+compatible: "zstreamer,pdm-src"
+
+include:
+  - "zstreamer,src.yaml"
+  - pinctrl-device.yaml
+
+properties:
+  sai:
+    type: phandle
+    required: true
+    description: |
+      SAI block device to use for PDM reception (e.g. <&sai1_a>).
+      Must be Block A (master-capable).  The driver reads ``clocks``
+      and ``reg`` from this node -- do not duplicate them here.
+
+  sample-rate-hz:
+    type: int
+    required: true
+    description: |
+      Output PCM sample rate in Hz (e.g. 16000).  Must evenly divide
+      pdm-clk-freq-hz to produce an integer decimation ratio.
+
+  pdm-clk-freq-hz:
+    type: int
+    default: 2048000
+    description: |
+      PDM bit-clock frequency in Hz output on the SAI CK1 pin.
+      SPK0641HT4H-1 supports 1.0 -- 4.8 MHz.  Default 2.048 MHz
+      gives a clean decimation ratio of 128 at 16 kHz PCM output.
+
+  right-channel:
+    type: boolean
+    description: |
+      Capture the right PDM channel (rising-edge data) instead of the
+      default left channel (falling-edge data).  Set this when the
+      microphone Select pin is tied to VDD.
+
+  dmas:
+    type: phandle-array
+    required: true
+    description: |
+      GPDMA channel for SAI RX.  Format:
+      <&gpdma1 channel request flags>.  The request slot for SAI1
+      Block A is 36 (LL_GPDMA1_REQUEST_SAI1_A).
+
+  dma-names:
+    type: string-array
+    required: true
+    description: Must be "rx".

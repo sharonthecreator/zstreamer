@@ -1,0 +1,18 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_PDM
+	bool
+
+config ZSTREAMER_PDM_SRC
+	bool "PDM microphone source driver"
+	depends on DT_HAS_ZSTREAMER_PDM_SRC_ENABLED
+	depends on ZSTREAMER
+	depends on DMA
+	depends on PINCTRL
+	depends on SOC_FAMILY_STM32
+	select ZSTREAMER_PDM
+	help
+	  Enable the SAI-based PDM microphone source streaming node.
+	  Configures an STM32 SAI in PDM master-receiver mode with DMA
+	  and fourth-order CIC decimation to produce signed int16 PCM.
