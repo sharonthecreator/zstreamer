@@ -69,6 +69,7 @@ struct pdm_src_config {
   bool right_channel;
   uint16_t half_pdm_words;
   uint16_t decimation_ratio;
+  uint16_t warmup_buffers;
   const struct pinctrl_dev_config *pcfg;
 };
 
@@ -83,6 +84,7 @@ struct pdm_src_data {
   int64_t integrators[CIC_ORDER];
   int64_t comb_delay[CIC_ORDER];
   uint16_t decimation_counter;
+  uint16_t warmup_remaining;
   uint8_t cic_shift;
 };
 
@@ -127,6 +129,15 @@ static int pdm_src_process(const struct device *dev, struct net_buf *buf) {
 
   if (k_sem_take(&data->half_ready, K_MSEC(2000)) != 0) {
     LOG_WRN("PDM DMA half-buffer timeout");
+    return -EAGAIN;
+  }
+
+  /* Discard initial buffers while the PDM microphone settles.
+   * Most MEMS PDM mics need up to 200 ms wake-up time after power-on;
+   * during this period the output is invalid.
+   */
+  if (data->warmup_remaining > 0) {
+    data->warmup_remaining--;
     return -EAGAIN;
   }
 
@@ -329,6 +340,7 @@ static int pdm_src_init(const struct device *dev) {
   memset(data->integrators, 0, sizeof(data->integrators));
   memset(data->comb_delay, 0, sizeof(data->comb_delay));
   data->decimation_counter = 0;
+  data->warmup_remaining = cfg->warmup_buffers;
   data->cic_shift = compute_cic_shift(cfg->decimation_ratio);
 
   ret = pinctrl_apply_state(cfg->pcfg, PINCTRL_STATE_DEFAULT);
@@ -426,6 +438,7 @@ static const struct zstreamer_node_driver_api pdm_src_api = {
       .right_channel = DT_INST_PROP(inst, right_channel),                      \
       .decimation_ratio = DECIMATION_RATIO(inst),                              \
       .half_pdm_words = HALF_PDM_WORDS(inst),                                  \
+      .warmup_buffers = DT_INST_PROP(inst, warmup_buffers),                    \
       .pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(inst),                            \
   };                                                                           \
                                                                                \

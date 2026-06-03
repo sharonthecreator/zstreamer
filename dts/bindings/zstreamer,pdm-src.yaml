@@ -81,3 +81,13 @@ properties:
     type: string-array
     required: true
     description: Must be "rx".
+
+  warmup-buffers:
+    type: int
+    default: 0
+    description: |
+      Number of initial half-buffers to silently discard after DMA
+      starts.  PDM microphones and the CIC integrator chain need a
+      settling period; the first few buffers contain transient noise
+      that can trigger false detections downstream.  Set to 0 to
+      disable (default).
