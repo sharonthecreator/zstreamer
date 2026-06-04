@@ -315,6 +315,8 @@ static int fs_sink_process(const struct device *dev, struct net_buf *buf) {
 
   /* Sync file entry so file size is visible if power is lost. */
   fs_sync(&data->current_file);
+  LOG_DBG("[%s] wrote %u bytes (total %zu)", dev->name, buf->len,
+          data->current_file_size);
 
   return 0;
 }

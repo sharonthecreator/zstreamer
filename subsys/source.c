@@ -18,102 +18,102 @@ LOG_MODULE_REGISTER(zstreamer_source, CONFIG_ZSTREAMER_LOG_LEVEL);
 /* Thread entry                                                        */
 /* ------------------------------------------------------------------ */
 
-void zstreamer_source_thread_entry(void *p1, void *p2, void *p3)
-{
-	const struct device *dev = (const struct device *)p1;
-	struct zstreamer_source_data *data = (struct zstreamer_source_data *)dev->data;
-	const struct zstreamer_source_config *cfg =
-		(const struct zstreamer_source_config *)dev->config;
-	const struct zstreamer_node_driver_api *api =
-		(const struct zstreamer_node_driver_api *)dev->api;
+void zstreamer_source_thread_entry(void *p1, void *p2, void *p3) {
+  const struct device *dev = (const struct device *)p1;
+  struct zstreamer_source_data *data =
+      (struct zstreamer_source_data *)dev->data;
+  const struct zstreamer_source_config *cfg =
+      (const struct zstreamer_source_config *)dev->config;
+  const struct zstreamer_node_driver_api *api =
+      (const struct zstreamer_node_driver_api *)dev->api;
 
-	ARG_UNUSED(p2);
-	ARG_UNUSED(p3);
+  ARG_UNUSED(p2);
+  ARG_UNUSED(p3);
 
-	while (true) {
-		k_sem_take(&data->run_sem, K_FOREVER);
+  while (true) {
+    k_sem_take(&data->run_sem, K_FOREVER);
 
-		while (atomic_get(&data->running)) {
-			struct net_buf *buf = zstreamer_node_alloc_buf(dev, K_MSEC(100));
+    while (atomic_get(&data->running)) {
+      struct net_buf *buf = zstreamer_node_alloc_buf(dev, K_MSEC(100));
 
-			if (buf == NULL) {
-				k_yield();
-				continue;
-			}
+      if (buf == NULL) {
+        k_yield();
+        continue;
+      }
 
-			int ret = api->process(dev, buf);
+      int ret = api->process(dev, buf);
 
-			if (ret != 0) {
-				net_buf_unref(buf);
-				if (ret != -EAGAIN) {
-					LOG_ERR("[%s] generate failed: %d",
-						dev->name, ret);
-				}
-				continue;
-			}
+      if (ret != 0) {
+        net_buf_unref(buf);
+        if (ret != -EAGAIN) {
+          LOG_ERR("[%s] generate failed: %d", dev->name, ret);
+        }
+        k_yield();
+        continue;
+      }
 
-			zstreamer_node_distribute(dev, buf, cfg->common.children,
-						  cfg->common.num_children);
-			k_yield();
-		}
+      zstreamer_node_distribute(dev, buf, cfg->common.children,
+                                cfg->common.num_children);
+      k_yield();
+    }
 
-		k_sem_give(&data->idle_sem);
-	}
+    k_sem_give(&data->idle_sem);
+  }
 }
 
 /* ------------------------------------------------------------------ */
 /* Init                                                                */
 /* ------------------------------------------------------------------ */
 
-int zstreamer_source_common_init(const struct device *dev)
-{
-	struct zstreamer_source_data *data = (struct zstreamer_source_data *)dev->data;
-	const struct zstreamer_source_config *cfg =
-		(const struct zstreamer_source_config *)dev->config;
+int zstreamer_source_common_init(const struct device *dev) {
+  struct zstreamer_source_data *data =
+      (struct zstreamer_source_data *)dev->data;
+  const struct zstreamer_source_config *cfg =
+      (const struct zstreamer_source_config *)dev->config;
 
-	k_sem_init(&data->run_sem, 0, 1);
-	k_sem_init(&data->idle_sem, 0, 1);
+  k_sem_init(&data->run_sem, 0, 1);
+  k_sem_init(&data->idle_sem, 0, 1);
 
-	int ret = zstreamer_node_common_init(dev);
+  int ret = zstreamer_node_common_init(dev);
 
-	if (ret == 0 && cfg->autostart) {
-		LOG_INF("[%s] autostart enabled", dev->name);
-		ret = zstreamer_source_start(dev);
-	}
+  if (ret == 0 && cfg->autostart) {
+    LOG_INF("[%s] autostart enabled", dev->name);
+    ret = zstreamer_source_start(dev);
+  }
 
-	return ret;
+  return ret;
 }
 
 /* ------------------------------------------------------------------ */
 /* Public API                                                          */
 /* ------------------------------------------------------------------ */
 
-int zstreamer_source_start(const struct device *dev)
-{
-	struct zstreamer_source_data *data = (struct zstreamer_source_data *)dev->data;
+int zstreamer_source_start(const struct device *dev) {
+  struct zstreamer_source_data *data =
+      (struct zstreamer_source_data *)dev->data;
 
-	if (atomic_set(&data->running, 1) == 1) {
-		return -EALREADY;
-	}
+  if (atomic_set(&data->running, 1) == 1) {
+    return -EALREADY;
+  }
 
-	k_sem_give(&data->run_sem);
+  k_sem_give(&data->run_sem);
 
-	return 0;
+  return 0;
 }
 
-int zstreamer_source_stop(const struct device *dev)
-{
-	struct zstreamer_source_data *data = (struct zstreamer_source_data *)dev->data;
+int zstreamer_source_stop(const struct device *dev) {
+  struct zstreamer_source_data *data =
+      (struct zstreamer_source_data *)dev->data;
 
-	if (atomic_set(&data->running, 0) == 0) {
-		return -EALREADY;
-	}
+  if (atomic_set(&data->running, 0) == 0) {
+    return -EALREADY;
+  }
 
-	if (k_sem_take(&data->idle_sem, K_SECONDS(5)) != 0) {
-		LOG_WRN("[%s] stop timeout waiting for idle", dev->name);
-	}
+  if (k_sem_take(&data->idle_sem, K_SECONDS(5)) != 0) {
+    LOG_WRN("[%s] stop timeout waiting for idle", dev->name);
+  }
 
-	zstreamer_node_drain_fifo(&data->common.fifo);
+  zstreamer_node_drain_fifo(&data->common.fifo);
 
-	return 0;
+  return 0;
 }
