@@ -37,6 +37,7 @@ void zstreamer_source_thread_entry(void *p1, void *p2, void *p3) {
       struct net_buf *buf = zstreamer_node_alloc_buf(dev, K_MSEC(100));
 
       if (buf == NULL) {
+        LOG_WRN("[%s] buf alloc failed", dev->name);
         k_yield();
         continue;
       }

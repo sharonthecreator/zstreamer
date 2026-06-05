@@ -179,46 +179,55 @@ static int pdm_src_adf_init(const struct pdm_src_config *cfg,
     return -EINVAL;
   }
 
-  /* Try CCKDIV=0 first (no extra division on CCK output). */
-  if (total_div <= 128) {
-    procdiv = total_div - 1;
-    cckdiv = 0;
-  } else {
-    /* Factor total_div = (procdiv+1) * (cckdiv+1).
-     * Pick cckdiv to keep procdiv in range [0..127].
-     */
-    cckdiv = (total_div + 127) / 128 - 1;
-    if (cckdiv > 15) {
-      LOG_ERR("Cannot reach pdm_clk %u from ker_clk %u", cfg->pdm_clk_freq_hz,
-              adf_ker_clk);
-      return -EINVAL;
+  /* LF_SPI mode requires proc_clk >= 2 * CCK, so CCKDIV >= 1.
+   * Factor total_div = (procdiv+1) * (cckdiv+1) with cckdiv >= 1.
+   */
+  cckdiv = 1;
+  while (cckdiv <= 15) {
+    if (total_div % (cckdiv + 1) == 0) {
+      procdiv = total_div / (cckdiv + 1) - 1;
+      if (procdiv <= 127) {
+        break;
+      }
     }
-    procdiv = total_div / (cckdiv + 1) - 1;
+    cckdiv++;
+  }
+  if (cckdiv > 15) {
+    LOG_ERR("Cannot reach pdm_clk %u from ker_clk %u", cfg->pdm_clk_freq_hz,
+            adf_ker_clk);
+    return -EINVAL;
   }
 
   uint32_t actual_pdm_clk = adf_ker_clk / ((procdiv + 1) * (cckdiv + 1));
 
-  /* CKGCR: enable clock dividers, enable CCK0 output, CCK0 direction
-   * output, normal mode (not trigger-based).
+  /* CKGCR must be configured in two steps (per HAL reference):
+   * 1. Write dividers + CCK0 output config with CKDEN=0
+   * 2. Set CKDEN to activate the clock generator
    */
-  adf->CKGCR = MDF_CKGCR_CKDEN | MDF_CKGCR_CCK0EN | MDF_CKGCR_CCK0DIR |
+  adf->CKGCR = 0U;
+  adf->CKGCR = MDF_CKGCR_CCK0EN | MDF_CKGCR_CCK0DIR |
                (cckdiv << MDF_CKGCR_CCKDIV_Pos) |
                (procdiv << MDF_CKGCR_PROCDIV_Pos);
+  __DSB();
+  adf->CKGCR |= MDF_CKGCR_CKDEN;
+  __DSB();
 
   /* Wait for clock generator to become active. */
-  uint32_t timeout = 10000;
+  uint32_t timeout = 100000;
   while (!(adf->CKGCR & MDF_CKGCR_CCKACTIVE) && timeout > 0) {
     timeout--;
   }
   if (timeout == 0) {
-    LOG_ERR("ADF clock generator did not become active");
+    LOG_ERR("ADF clock generator did not become active (CKGCR=0x%08x)",
+            adf->CKGCR);
     return -ETIMEDOUT;
   }
 
   /* ── Serial interface (SITF0) ───────────────────────────────────
-   * Normal SPI mode (SITFMOD=01), clock from CCK0 (SCKSRC=00).
+   * LF_SPI mode (SITFMOD=00), clock from CCK0 (SCKSRC=00).
+   * LF_SPI only requires proc_clk >= 2 * CCK (per AN5795).
    */
-  flt->SITFCR = MDF_SITFCR_SITFMOD_0; /* Normal SPI, CCK0 source */
+  flt->SITFCR = 0U; /* LF_SPI mode, CCK0 source */
 
   /* ── Bitstream matrix ───────────────────────────────────────────
    * Route SITF0 to DFLT0.  BSSEL selects the bitstream edge:
@@ -230,14 +239,18 @@ static int pdm_src_adf_init(const struct pdm_src_config *cfg,
   /* ── CIC filter configuration ───────────────────────────────────
    * Sinc4 mode (CICMOD=100), data from BSMX (DATSRC=00).
    * Decimation ratio = pdm_clk / sample_rate, register = ratio - 1.
-   * SCALE = 0 (default gain, adjust if needed).
+   *
+   * SCALE must attenuate CIC output to fit 24-bit DFLTDR.
+   * CIC max bits = N * log2(R).  For Sinc4 R=125: 4*log2(125) ≈ 28.
+   * Need SCALE = -(28 - 24) = -4.  HAL encoding: (-4 - 16) & 0x3F = 44.
    */
   uint32_t mcicd = cfg->decimation_ratio - 1;
+  uint32_t scale_reg = (uint32_t)(-4 - 16) & 0x3FU;
   flt->DFLTCICR = MDF_DFLTCICR_CICMOD_2 | /* Sinc4 */
                   (mcicd << MDF_DFLTCICR_MCICD_Pos) |
-                  (0U << MDF_DFLTCICR_SCALE_Pos);
+                  (scale_reg << MDF_DFLTCICR_SCALE_Pos);
 
-  /* Bypass reshape filter (not needed for basic PDM-to-PCM). */
+  /* Bypass reshape filter; enable high-pass filter to remove DC offset. */
   flt->DFLTRSFR = MDF_DFLTRSFR_RSFLTBYP;
 
   /* ── Digital filter control ─────────────────────────────────────
@@ -285,8 +298,8 @@ static int pdm_src_dma_init(const struct device *dev) {
   data->dma_cfg.channel_direction = PERIPHERAL_TO_MEMORY;
   data->dma_cfg.source_data_size = 2; /* 16-bit */
   data->dma_cfg.dest_data_size = 2;
-  data->dma_cfg.source_burst_length = 1;
-  data->dma_cfg.dest_burst_length = 1;
+  data->dma_cfg.source_burst_length = 2;
+  data->dma_cfg.dest_burst_length = 2;
   data->dma_cfg.dma_callback = pdm_src_dma_cb;
   data->dma_cfg.user_data = data;
   data->dma_cfg.head_block = &data->dma_blk;
@@ -372,7 +385,7 @@ static const struct zstreamer_node_driver_api pdm_src_api = {
 #define ADF_PCLKEN(inst)                                                       \
   {                                                                            \
       .bus = STM32_CLOCK_BUS_AHB3,                                             \
-      .enr = RCC_AHB3ENR_ADF1EN_Pos,                                           \
+      .enr = RCC_AHB3ENR_ADF1EN,                                               \
   }
 
 /* ADF1 kernel clock source: read from the second ``clocks`` entry in

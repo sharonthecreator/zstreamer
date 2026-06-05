@@ -204,16 +204,20 @@ static int open_new_file(const struct device *dev) {
  * wrapping to 0 when file_count is reached (cyclic buffer of files).
  * Persists the new index to <prefix>idx so we resume correctly after reboot.
  */
-static int rotate_file(const struct device *dev) {
+static int close_current_file(const struct device *dev) {
   const struct fs_sink_config *cfg = dev->config;
   struct fs_sink_data *data = dev->data;
   int ret;
+
+  fs_sync(&data->current_file);
 
   ret = fs_close(&data->current_file);
   if (ret != 0) {
     LOG_ERR("failed to close file: %d", ret);
     return ret;
   }
+
+  data->file_opened = false;
 
   data->file_index++;
   if (cfg->file_count && data->file_index >= cfg->file_count) {
@@ -223,6 +227,19 @@ static int rotate_file(const struct device *dev) {
   ret = save_index(dev);
   if (ret != 0) {
     LOG_WRN("failed to persist index: %d", ret);
+  }
+
+  LOG_DBG("[%s] closed file (size %zu), next index %u", dev->name,
+          data->current_file_size, data->file_index);
+
+  return 0;
+}
+
+static int rotate_file(const struct device *dev) {
+  int ret = close_current_file(dev);
+
+  if (ret != 0) {
+    return ret;
   }
 
   return open_new_file(dev);
@@ -303,8 +320,7 @@ static int fs_sink_process(const struct device *dev, struct net_buf *buf) {
 
     if (written < 0) {
       LOG_ERR("fs_write failed: %zd", written);
-      fs_close(&data->current_file);
-      data->file_opened = false;
+      close_current_file(dev);
       return (int)written;
     }
 
@@ -313,8 +329,6 @@ static int fs_sink_process(const struct device *dev, struct net_buf *buf) {
     remaining -= written;
   }
 
-  /* Sync file entry so file size is visible if power is lost. */
-  fs_sync(&data->current_file);
   LOG_DBG("[%s] wrote %u bytes (total %zu)", dev->name, buf->len,
           data->current_file_size);
 
@@ -356,11 +370,7 @@ int fs_sink_close(const struct device *dev) {
     return 0;
   }
 
-  int ret = fs_close(&data->current_file);
-
-  data->file_opened = false;
-
-  return ret;
+  return close_current_file(dev);
 }
 
 /**
