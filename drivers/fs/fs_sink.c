@@ -200,9 +200,10 @@ static int open_new_file(const struct device *dev) {
 }
 
 /**
- * Close the current file and open the next one.  Advances file_index,
- * wrapping to 0 when file_count is reached (cyclic buffer of files).
- * Persists the new index to <prefix>idx so we resume correctly after reboot.
+ * Close the current file and advance to the next index.  Advances
+ * file_index, wrapping to 0 when file_count is reached (cyclic buffer of
+ * files), and persists the new index to <prefix>idx so we resume correctly
+ * after reboot.  The next buffer received opens a fresh file.
  */
 static int close_current_file(const struct device *dev) {
   const struct fs_sink_config *cfg = dev->config;
@@ -212,12 +213,15 @@ static int close_current_file(const struct device *dev) {
   fs_sync(&data->current_file);
 
   ret = fs_close(&data->current_file);
+  /* Drop the handle regardless of the close result: on a persistent I/O
+   * error (the case write-error recovery exists for) fs_close() may fail
+   * too, and we must still reopen a fresh file on the next buffer rather
+   * than keep writing to a dead handle. */
+  data->file_opened = false;
   if (ret != 0) {
     LOG_ERR("failed to close file: %d", ret);
     return ret;
   }
-
-  data->file_opened = false;
 
   data->file_index++;
   if (cfg->file_count && data->file_index >= cfg->file_count) {
