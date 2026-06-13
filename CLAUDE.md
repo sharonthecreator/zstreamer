@@ -49,12 +49,6 @@ timeout 120s ./build/test-<name>/zephyr/zephyr.exe
 
 Zephyr-style with area prefixes: `drivers: dac: fix value masking`, `subsys: node: add metadata`, `tests: dac: add multi-channel test`, `samples: sine2pwm: update overlay`, `ci: add clang-format`
 
-Trailer order: body, blank line, then:
-```
-Signed-off-by: Sharon Naim <sharonthecreator@gmail.com>
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-```
-
 ## Issue Tracking
 
 This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
