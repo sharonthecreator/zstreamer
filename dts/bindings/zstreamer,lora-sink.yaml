@@ -24,7 +24,8 @@ properties:
     type: int
     default: 0
     description: |
-      Signal bandwidth: 0 = 125 kHz, 1 = 250 kHz, 2 = 500 kHz.
+      Signal bandwidth enum value from Zephyr lora_signal_bandwidth.
+      Common values: 10 = 10.42 kHz, 125 = 125 kHz, 250 = 250 kHz, 500 = 500 kHz.
   spreading-factor:
     type: int
     default: 10

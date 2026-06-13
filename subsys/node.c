@@ -18,106 +18,110 @@ LOG_MODULE_REGISTER(zstreamer_node, CONFIG_ZSTREAMER_LOG_LEVEL);
 /* ------------------------------------------------------------------ */
 
 void zstreamer_node_distribute(const struct device *dev, struct net_buf *buf,
-			       const struct device *const *children, size_t num_children)
-{
-	struct zstreamer_node_data *child_data = NULL;
-	const struct zstreamer_node_config *child_cfg = NULL;
+                               const struct device *const *children,
+                               size_t num_children) {
+  struct zstreamer_node_data *child_data = NULL;
+  const struct zstreamer_node_config *child_cfg = NULL;
 
-	for (size_t i = 0; i < num_children; i++) {
-		child_data = (struct zstreamer_node_data *)children[i]->data;
-		child_cfg = (const struct zstreamer_node_config *)children[i]->config;
+  for (size_t i = 0; i < num_children; i++) {
+    child_data = (struct zstreamer_node_data *)children[i]->data;
+    child_cfg = (const struct zstreamer_node_config *)children[i]->config;
 
-		/* Pass the buffer directly if the child node is readonly,
-		 * or if it's the last child and the buffer has only one reference. */
-		if (child_cfg->readonly || (buf->ref == 1 && i == (num_children - 1))) {
-			buf = net_buf_ref(buf);
-			k_fifo_put(&child_data->fifo, buf);
-		}
-		/* Clone the buffer for a readwrite child, unless it's the last one and
-		 * the buffer hasn't been shared. */
-		else {
-			struct net_buf *clone = net_buf_clone(buf, K_NO_WAIT);
-			if (clone != NULL) {
-				k_fifo_put(&child_data->fifo, clone);
-			} else {
-				LOG_ERR("[%s] clone failed for %s", dev->name, children[i]->name);
-			}
-		}
-	}
+    /* Pass the buffer directly if the child node is readonly,
+     * or if it's the last child and the buffer has only one reference. */
+    if (child_cfg->readonly || (buf->ref == 1 && i == (num_children - 1))) {
+      buf = net_buf_ref(buf);
+      k_fifo_put(&child_data->fifo, buf);
+    }
+    /* Clone the buffer for a readwrite child, unless it's the last one and
+     * the buffer hasn't been shared. */
+    else {
+      struct net_buf *clone = net_buf_clone(buf, K_NO_WAIT);
+      if (clone != NULL) {
+        k_fifo_put(&child_data->fifo, clone);
+      } else {
+        LOG_ERR("[%s] clone failed for %s", dev->name, children[i]->name);
+      }
+    }
+  }
 
-	net_buf_unref(buf);
+  net_buf_unref(buf);
 }
 
-void zstreamer_node_drain_fifo(struct k_fifo *fifo)
-{
-	struct net_buf *buf;
+void zstreamer_node_drain_fifo(struct k_fifo *fifo) {
+  struct net_buf *buf;
 
-	while ((buf = k_fifo_get(fifo, K_NO_WAIT)) != NULL) {
-		net_buf_unref(buf);
-	}
+  while ((buf = k_fifo_get(fifo, K_NO_WAIT)) != NULL) {
+    net_buf_unref(buf);
+  }
 }
 
 /* ------------------------------------------------------------------ */
 /* Standard node thread entry                                         */
 /* ------------------------------------------------------------------ */
 
-void zstreamer_node_thread_entry(void *p1, void *p2, void *p3)
-{
-	const struct device *dev = (const struct device *)p1;
-	struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
-	const struct zstreamer_node_config *cfg = (const struct zstreamer_node_config *)dev->config;
-	const struct zstreamer_node_driver_api *api =
-		(const struct zstreamer_node_driver_api *)dev->api;
+void zstreamer_node_thread_entry(void *p1, void *p2, void *p3) {
+  const struct device *dev = (const struct device *)p1;
+  struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
+  const struct zstreamer_node_config *cfg =
+      (const struct zstreamer_node_config *)dev->config;
+  const struct zstreamer_node_driver_api *api =
+      (const struct zstreamer_node_driver_api *)dev->api;
 
-	ARG_UNUSED(p2);
-	ARG_UNUSED(p3);
+  ARG_UNUSED(p2);
+  ARG_UNUSED(p3);
 
-	while (true) {
-		struct net_buf *buf = k_fifo_get(&data->fifo, K_FOREVER);
+  while (true) {
+    struct net_buf *buf = k_fifo_get(&data->fifo, K_FOREVER);
 
-		if (buf == NULL) {
-			continue;
-		}
+    if (buf == NULL) {
+      continue;
+    }
 
-		int ret = api->process(dev, buf);
+    int ret = api->process(dev, buf);
 
-		if (ret != 0) {
-			LOG_ERR("[%s] process error: %d", dev->name, ret);
-			net_buf_unref(buf);
-			continue;
-		}
+    if (ret != 0) {
+      /* Silent unrefing if the node decides to drop the buffer. */
+      if (ret != -EAGAIN) {
+        LOG_ERR("[%s] process error: %d", dev->name, ret);
+      }
+      net_buf_unref(buf);
+      continue;
+    }
 
-		zstreamer_node_distribute(dev, buf, cfg->children, cfg->num_children);
-	}
+    zstreamer_node_distribute(dev, buf, cfg->children, cfg->num_children);
+  }
 }
 
 /* ------------------------------------------------------------------ */
 /* Common init                                                         */
 /* ------------------------------------------------------------------ */
 
-int zstreamer_node_common_init(const struct device *dev)
-{
-	struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
-	const struct zstreamer_node_config *cfg = (const struct zstreamer_node_config *)dev->config;
+int zstreamer_node_common_init(const struct device *dev) {
+  struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
+  const struct zstreamer_node_config *cfg =
+      (const struct zstreamer_node_config *)dev->config;
 
-	data->dev = dev;
-	k_fifo_init(&data->fifo);
+  data->dev = dev;
+  k_fifo_init(&data->fifo);
 
-	k_thread_create(&data->thread, data->stack, ZSTREAMER_THREAD_STACK_SIZE, cfg->thread_entry,
-			(void *)dev, NULL, NULL, cfg->thread_priority, 0, K_NO_WAIT);
+  k_thread_create(&data->thread, data->stack, ZSTREAMER_THREAD_STACK_SIZE,
+                  cfg->thread_entry, (void *)dev, NULL, NULL,
+                  cfg->thread_priority, 0, K_NO_WAIT);
 
-	return 0;
+  return 0;
 }
 
 /* ------------------------------------------------------------------ */
 /* Buffer allocation                                                   */
 /* ------------------------------------------------------------------ */
 
-struct net_buf *zstreamer_node_alloc_buf(const struct device *dev, k_timeout_t timeout)
-{
-	const struct zstreamer_node_config *cfg = (const struct zstreamer_node_config *)dev->config;
-	const struct zstreamer_graph_config *graph_cfg =
-		(const struct zstreamer_graph_config *)cfg->graph->config;
+struct net_buf *zstreamer_node_alloc_buf(const struct device *dev,
+                                         k_timeout_t timeout) {
+  const struct zstreamer_node_config *cfg =
+      (const struct zstreamer_node_config *)dev->config;
+  const struct zstreamer_graph_config *graph_cfg =
+      (const struct zstreamer_graph_config *)cfg->graph->config;
 
-	return net_buf_alloc_fixed(graph_cfg->pool, timeout);
+  return net_buf_alloc_fixed(graph_cfg->pool, timeout);
 }

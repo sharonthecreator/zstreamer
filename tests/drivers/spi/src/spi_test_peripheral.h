@@ -20,7 +20,8 @@
  * @param len    Number of bytes.
  * @return Number of bytes actually loaded.
  */
-uint32_t spi_test_put_rx_data(const struct device *dev, const uint8_t *data, size_t len);
+uint32_t spi_test_put_rx_data(const struct device *dev, const uint8_t *data,
+                              size_t len);
 
 /**
  * @brief Retrieve data that was written by the SPI master.
@@ -30,7 +31,8 @@ uint32_t spi_test_put_rx_data(const struct device *dev, const uint8_t *data, siz
  * @param len    Maximum bytes to retrieve.
  * @return Number of bytes actually retrieved.
  */
-uint32_t spi_test_get_tx_data(const struct device *dev, uint8_t *buf, size_t len);
+uint32_t spi_test_get_tx_data(const struct device *dev, uint8_t *buf,
+                              size_t len);
 
 /**
  * @brief Flush (discard) all pending RX data.

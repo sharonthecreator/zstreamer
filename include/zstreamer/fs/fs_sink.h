@@ -30,9 +30,10 @@ extern "C" {
  * @param user_data   User-provided context pointer.
  * @return 0 on success, negative errno on failure.
  */
-typedef int (*fs_sink_filename_cb_t)(const struct device *dev, char *buf, size_t buf_size,
-				     const char *mount_path, const char *prefix,
-				     uint32_t file_index, void *user_data);
+typedef int (*fs_sink_filename_cb_t)(const struct device *dev, char *buf,
+                                     size_t buf_size, const char *mount_path,
+                                     const char *prefix, uint32_t file_index,
+                                     void *user_data);
 
 /**
  * @brief Set a custom filename handler for a sink-fs device.
@@ -45,8 +46,8 @@ typedef int (*fs_sink_filename_cb_t)(const struct device *dev, char *buf, size_t
  * @param user_data  Opaque pointer passed to the callback.
  * @return 0 on success, negative errno on failure.
  */
-int fs_sink_set_filename_handler(const struct device *dev, fs_sink_filename_cb_t cb,
-				 void *user_data);
+int fs_sink_set_filename_handler(const struct device *dev,
+                                 fs_sink_filename_cb_t cb, void *user_data);
 
 /**
  * @brief Close the current file.

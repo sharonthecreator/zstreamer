@@ -29,13 +29,13 @@ extern "C" {
  */
 
 struct zstreamer_filter_config {
-	struct zstreamer_node_config common;
-	const struct device *const *false_children;
-	size_t num_false_children;
+  struct zstreamer_node_config common;
+  const struct device *const *false_children;
+  size_t num_false_children;
 };
 
 struct zstreamer_filter_data {
-	struct zstreamer_node_data common;
+  struct zstreamer_node_data common;
 };
 
 /**
@@ -68,12 +68,12 @@ extern void zstreamer_filter_thread_entry(void *p1, void *p2, void *p3);
  * @param inst      Devicetree instance number.
  * @param _readonly true if process() never modifies the buffer contents.
  */
-#define ZSTREAMER_FILTER_CONFIG_INIT(inst, _readonly)                                              \
-	{.common = {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(inst, zstreamer_filter_children_##inst,      \
-						      Z_ZSTREAMER_NUM_CHILDREN(inst),              \
-						      zstreamer_filter_thread_entry, _readonly)},  \
-	 .false_children = zstreamer_filter_false_children_##inst,                                 \
-	 .num_false_children = Z_ZSTREAMER_NUM_FALSE_CHILDREN(inst)}
+#define ZSTREAMER_FILTER_CONFIG_INIT(inst, _readonly)                          \
+  {.common = {Z_ZSTREAMER_NODE_BASE_CONFIG_INIT(                               \
+       inst, zstreamer_filter_children_##inst, Z_ZSTREAMER_NUM_CHILDREN(inst), \
+       zstreamer_filter_thread_entry, _readonly)},                             \
+   .false_children = zstreamer_filter_false_children_##inst,                   \
+   .num_false_children = Z_ZSTREAMER_NUM_FALSE_CHILDREN(inst)}
 
 /**
  * @brief Filter node data initializer.
@@ -87,10 +87,10 @@ extern void zstreamer_filter_thread_entry(void *p1, void *p2, void *p3);
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_FILTER_DATA_INIT(inst)                                                           \
-	{                                                                                          \
-		.common = {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_filter, inst)},               \
-	}
+#define ZSTREAMER_FILTER_DATA_INIT(inst)                                       \
+  {                                                                            \
+      .common = {Z_ZSTREAMER_NODE_BASE_DATA_INIT(zstreamer_filter, inst)},     \
+  }
 
 /**
  * @brief Pre-define the thread stack, children, and false-children arrays
@@ -107,10 +107,11 @@ extern void zstreamer_filter_thread_entry(void *p1, void *p2, void *p3);
  *
  * @param inst  Devicetree instance number.
  */
-#define ZSTREAMER_FILTER_DT_INST_PRE_DEFINE(inst)                                                  \
-	Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_filter, inst);                                       \
-	Z_ZSTREAMER_FALSE_CHILDREN_DEFINE(zstreamer_filter, inst);                                 \
-	static K_THREAD_STACK_DEFINE(zstreamer_filter_stack_##inst, ZSTREAMER_THREAD_STACK_SIZE)
+#define ZSTREAMER_FILTER_DT_INST_PRE_DEFINE(inst)                              \
+  Z_ZSTREAMER_CHILDREN_DEFINE(zstreamer_filter, inst);                         \
+  Z_ZSTREAMER_FALSE_CHILDREN_DEFINE(zstreamer_filter, inst);                   \
+  static K_THREAD_STACK_DEFINE(zstreamer_filter_stack_##inst,                  \
+                               ZSTREAMER_THREAD_STACK_SIZE)
 
 /**
  * @}

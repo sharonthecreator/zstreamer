@@ -36,3 +36,8 @@ properties:
     type: int
     default: 0
     description: Max number of files before wrapping index to 0. 0 = unlimited.
+
+  max-write-size:
+    type: int
+    default: 0
+    description: Max bytes per fs_write call. Large buffers are chunked. 0 = no limit.
