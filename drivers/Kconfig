@@ -13,10 +13,6 @@ rsource "fs/Kconfig"
 
 rsource "pwm/Kconfig"
 
-rsource "i2s/Kconfig"
-
 rsource "lora/Kconfig"
-
-rsource "pdm/Kconfig"
 
 rsource "test/Kconfig"
