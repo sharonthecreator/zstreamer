@@ -24,5 +24,5 @@ config ZSTREAMER_GPIO_BUTTON_SRC
 	select ZSTREAMER_GPIO
 	help
 	  Enable the button source streaming node driver.
-	  Emits one empty buffer per button press. Optionally, a long press
-	  enters repeat mode: one buffer per interval for a fixed duration.
+	  Emits one empty buffer per button press, routed by press type:
+	  short presses to children, long presses to long-press-children.

@@ -4,14 +4,14 @@
  *
  * Button source for zstreamer.
  *
- * Short press: emits exactly one empty buffer.
- * Long press (held >= long-press-ms, if long-press-ms > 0): "repeat mode" —
- * emits one empty buffer every repeat-interval-ms for repeat-duration-ms,
- * then returns to idle.
+ * Emits exactly one empty buffer per button press, routed by press
+ * type: short presses go to children, long presses (held >=
+ * long-press-ms, if long-press-ms > 0) go to long-press-children.
+ * Periodic/repeated behavior is composed downstream (e.g. a
+ * looper_node on the long-press path), not built in.
  *
- * Emit model: each process() call blocks/sleeps and returns 0 to emit exactly
- * one buffer; the source framework loops and calls process() again. State
- * lives in button_src_data so it survives across calls.
+ * Emit model: each process() call blocks until a press and emits one
+ * buffer; the source framework loops and calls process() again.
  */
 
 #define DT_DRV_COMPAT zstreamer_button_src
@@ -36,8 +36,8 @@ struct button_src_config {
 	struct zstreamer_source_config common;
 	struct gpio_dt_spec button;
 	uint32_t long_press_ms;
-	uint32_t repeat_interval_ms;
-	uint32_t repeat_duration_ms;
+	const struct device *const *long_press_children;
+	size_t num_long_press_children;
 };
 
 struct button_src_data {
@@ -45,9 +45,6 @@ struct button_src_data {
 	struct gpio_callback cb_data;
 	struct k_sem press_sem;
 	const struct device *dev;
-	/* Repeat-mode state, carried across process() calls. */
-	bool repeat_active;
-	int64_t repeat_deadline; /* k_uptime_get() value at which repeat mode ends */
 };
 
 static void button_pressed_cb(const struct device *port, struct gpio_callback *cb, uint32_t pins)
@@ -84,25 +81,11 @@ static int button_src_process(const struct device *dev, struct net_buf *buf)
 	const struct button_src_config *cfg = dev->config;
 	struct button_src_data *data = dev->data;
 
-	/* Already in repeat mode: pace subsequent emits and auto-stop on
-	 * deadline. */
-	if (data->repeat_active) {
-		if (k_uptime_get() >= data->repeat_deadline) {
-			data->repeat_active = false;
-			/* Drain presses queued during repeat mode so they don't fire a
-			 * spurious emit the instant we go idle. */
-			k_sem_reset(&data->press_sem);
-			/* fall through to idle/blocking path below */
-		} else {
-			k_msleep(cfg->repeat_interval_ms);
-			return 0; /* one emit per interval */
-		}
-	}
-
 	/* Idle: block until a press wakes us. */
 	k_sem_take(&data->press_sem, K_FOREVER);
 
-	/* long-press-ms == 0 disables repeat mode: every press is short. */
+	/* long-press-ms == 0 disables long-press detection: every press is
+	 * short. */
 	bool long_press = cfg->long_press_ms > 0 && button_held_for_long_press(cfg);
 
 	/* Drain any presses queued by bounce or a release+re-press during the hold
@@ -112,18 +95,19 @@ static int button_src_process(const struct device *dev, struct net_buf *buf)
 	k_sem_reset(&data->press_sem);
 
 	if (long_press) {
-		/* Enter repeat mode. Emit the first buffer immediately; subsequent
-		 * emits are paced by the repeat_active branch above. Deadline bounds
-		 * the mode to repeat_duration_ms regardless of how long the button is
-		 * held. */
-		data->repeat_active = true;
-		data->repeat_deadline = k_uptime_get() + cfg->repeat_duration_ms;
-		LOG_INF("[%s] repeat mode: emit every %u ms for %u ms", dev->name,
-			cfg->repeat_interval_ms, cfg->repeat_duration_ms);
-		return 0;
+		/* Route to the long-press children ourselves; the extra ref keeps buf
+		 * alive for the framework's unref on the -EAGAIN return (distribute
+		 * consumes one reference). */
+		LOG_INF("[%s] long press", dev->name);
+		struct net_buf *ref = net_buf_ref(buf);
+
+		ARG_UNUSED(ref);
+		zstreamer_node_distribute(dev, buf, cfg->long_press_children,
+					  cfg->num_long_press_children);
+		return -EAGAIN;
 	}
 
-	/* Short press: exactly one emit. */
+	/* Short press: framework distributes to children. */
 	return 0;
 }
 
@@ -171,13 +155,26 @@ static const struct zstreamer_node_driver_api button_src_api = {
 	.process = button_src_process,
 };
 
+#define BUTTON_SRC_LP_CHILD_GET(node_id, prop, idx)                                                \
+	DEVICE_DT_GET(DT_PHANDLE_BY_IDX(node_id, prop, idx))
+
+/* clang-format off */
+#define BUTTON_SRC_LP_CHILDREN_DEFINE(inst)                                    \
+  static const struct device *const button_src_lp_children_##inst[] =         \
+      {COND_CODE_1(                                                           \
+          DT_NODE_HAS_PROP(DT_DRV_INST(inst), long_press_children),           \
+          (DT_FOREACH_PROP_ELEM_SEP(DT_DRV_INST(inst), long_press_children,   \
+                                    BUTTON_SRC_LP_CHILD_GET, (, ))),          \
+          ())}
+
+#define BUTTON_SRC_NUM_LP_CHILDREN(inst)                                       \
+  COND_CODE_1(DT_NODE_HAS_PROP(DT_DRV_INST(inst), long_press_children),       \
+              (DT_PROP_LEN(DT_DRV_INST(inst), long_press_children)), (0))
+/* clang-format on */
+
 #define BUTTON_SRC_DEFINE(inst)                                                                    \
-	/* repeat_interval_ms is passed to k_msleep(), which takes int32_t; a                      \
-	 * value above INT32_MAX would wrap negative and turn the paced emit into                  \
-	 * a tight loop. Catch misconfiguration at build time. */                                  \
-	BUILD_ASSERT(DT_INST_PROP(inst, repeat_interval_ms) <= INT32_MAX,                          \
-		     "repeat-interval-ms must fit in int32_t (k_msleep)");                         \
 	ZSTREAMER_SOURCE_DT_INST_PRE_DEFINE(inst);                                                 \
+	BUTTON_SRC_LP_CHILDREN_DEFINE(inst);                                                       \
 	static struct button_src_data button_src_data_##inst = {                                   \
 		.common = ZSTREAMER_SOURCE_DATA_INIT(inst),                                        \
 	};                                                                                         \
@@ -185,8 +182,8 @@ static const struct zstreamer_node_driver_api button_src_api = {
 		.common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),                                      \
 		.button = GPIO_DT_SPEC_INST_GET(inst, gpios),                                      \
 		.long_press_ms = DT_INST_PROP(inst, long_press_ms),                                \
-		.repeat_interval_ms = DT_INST_PROP(inst, repeat_interval_ms),                      \
-		.repeat_duration_ms = DT_INST_PROP(inst, repeat_duration_ms),                      \
+		.long_press_children = button_src_lp_children_##inst,                              \
+		.num_long_press_children = BUTTON_SRC_NUM_LP_CHILDREN(inst),                       \
 	};                                                                                         \
 	DEVICE_DT_INST_DEFINE(inst, button_src_init, NULL, &button_src_data_##inst,                \
 			      &button_src_config_##inst, POST_KERNEL,                              \
