@@ -1,0 +1,28 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_GPIO
+	bool
+
+config ZSTREAMER_GPIO_PULSE_NODE
+	bool "GPIO pulse processor node driver"
+	depends on DT_HAS_ZSTREAMER_GPIO_PULSE_NODE_ENABLED
+	depends on ZSTREAMER
+	depends on GPIO
+	select ZSTREAMER_GPIO
+	help
+	  Enable the GPIO pulse processor node driver.
+	  Raises a GPIO pin when a buffer arrives, forwards the buffer after
+	  a configurable delay, and drops the pin after a configurable hold
+	  time — e.g. to wake a downstream MCU before sending to it.
+
+config ZSTREAMER_GPIO_BUTTON_SRC
+	bool "Button source driver"
+	depends on DT_HAS_ZSTREAMER_BUTTON_SRC_ENABLED
+	depends on ZSTREAMER
+	depends on GPIO
+	select ZSTREAMER_GPIO
+	help
+	  Enable the button source streaming node driver.
+	  Emits one empty buffer per button press. Optionally, a long press
+	  enters repeat mode: one buffer per interval for a fixed duration.

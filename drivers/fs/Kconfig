@@ -13,3 +13,14 @@ config ZSTREAMER_FS_SINK
 	help
 	  Enable the file system sink streaming node driver.
 	  Writes streamed data to files, rotating based on time or size.
+
+config ZSTREAMER_FS_MOUNTED_FILTER
+	bool "Filesystem mount gate filter driver"
+	depends on DT_HAS_ZSTREAMER_FS_MOUNTED_FILTER_ENABLED
+	depends on ZSTREAMER
+	depends on FILE_SYSTEM
+	select ZSTREAMER_FS
+	help
+	  Enable the filesystem mount gate filter driver.
+	  Checks once (on the first buffer) whether a filesystem is mounted
+	  at mount-path; if so, passes all buffers, otherwise drops them.

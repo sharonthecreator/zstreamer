@@ -1,0 +1,18 @@
+description: |
+  Random timer source for zstreamer.
+  Generates an empty buffer at random intervals between
+  min-range-seconds and max-range-seconds.
+
+compatible: "zstreamer,random-timer-src"
+
+include: zstreamer,src.yaml
+
+properties:
+  min-range-seconds:
+    type: int
+    required: true
+    description: Minimum interval in seconds between buffer emissions.
+  max-range-seconds:
+    type: int
+    required: true
+    description: Maximum interval in seconds between buffer emissions.

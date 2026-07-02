@@ -1,0 +1,18 @@
+description: |
+  Looper processor node for zstreamer.
+  Retransmits each incoming net_buf a configurable number of times,
+  e.g. for reliability over lossy transports.
+
+compatible: "zstreamer,looper-node"
+
+include: zstreamer,node.yaml
+
+properties:
+  retransmit-count:
+    type: int
+    default: 3
+    description: Total number of times to forward each buffer.
+  delay-ms:
+    type: int
+    default: 0
+    description: Optional delay in milliseconds between retransmissions.

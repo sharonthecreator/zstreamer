@@ -1,0 +1,26 @@
+description: |
+  GPIO pulse processor node for zstreamer.
+  Sets a GPIO pin HIGH when a buffer arrives, passes it downstream,
+  then sets the pin LOW after a configurable hold time.
+
+compatible: "zstreamer,gpio-pulse-node"
+
+include: zstreamer,node.yaml
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: GPIO pin to pulse (output, active high).
+  hold-ms:
+    type: int
+    default: 500
+    description: |
+      Time in milliseconds to keep the pin HIGH after a buffer arrives.
+  delay-ms:
+    type: int
+    default: 200
+    description: |
+      Delay in milliseconds after raising the pin before forwarding the
+      buffer downstream.  Must be long enough for the downstream
+      peripheral to be ready (e.g. an MCU booting after an NRST reset).

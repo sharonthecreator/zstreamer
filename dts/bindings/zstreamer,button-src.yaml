@@ -1,0 +1,37 @@
+description: |
+  Button source for zstreamer.
+
+  Short press emits one empty buffer. A long press (held >= long-press-ms,
+  when long-press-ms > 0) enters "repeat mode": emits an empty buffer every
+  repeat-interval-ms for repeat-duration-ms, then returns to idle. Hold
+  detection is done by polling the GPIO level inside process().
+
+compatible: "zstreamer,button-src"
+
+include: zstreamer,src.yaml
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: GPIO spec for the button input (e.g. user button).
+
+  long-press-ms:
+    type: int
+    default: 5000
+    description: |
+      How long (ms) the button must stay held to trigger repeat mode.
+      Released before this threshold is treated as a short press (one
+      emit). 0 disables long-press detection entirely.
+
+  repeat-interval-ms:
+    type: int
+    default: 10000
+    description: Period (ms) between emits while in repeat mode.
+
+  repeat-duration-ms:
+    type: int
+    default: 900000
+    description: |
+      Total time (ms) repeat mode stays active before returning to idle.
+      Default 900000 = 15 minutes.
