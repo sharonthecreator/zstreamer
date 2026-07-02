@@ -111,6 +111,8 @@ timeout 120s ./build/test-node/zephyr/zephyr.exe
 
 # Build a sample for hardware
 west build -b nucleo_u575zi_q samples/uart2uart
+west build -b nucleo_wl55jc samples/button2led
+west build -b nucleo_u5a5zj_q samples/adc2uart
 ```
 
 ## Roadmap
@@ -132,6 +134,12 @@ west build -b nucleo_u575zi_q samples/uart2uart
 - [x] **PWM sink** — drive PWM duty cycle from pipeline data
 - [x] **DAC sink** — analog output (`sine_src -> dac_sink` = function generator)
 - [x] **LoRa source/sink** — wireless data over LoRa radio
+- [x] **Button source** — one buffer per press, short/long-press routing
+- [x] **GPIO pulse node** — pulse a pin around buffer passage (wake/reset a peer)
+- [x] **Looper processor** — N-times retransmit, fixed or uniform-random gap
+- [x] **Random timer source** — empty-buffer ticks at a random interval
+- [x] **FS mount-gate filter** — pass/drop based on filesystem mount state
+- [x] **STM32 ADC DMA source** — timer-TRGO-paced circular-DMA capture
 - [ ] **I2S source/sink** — audio streaming (mic-to-speaker, recording, DSP)
 - [ ] **BLE GATT sink/source** — wireless data over BLE notifications
 - [ ] **Sensor source** — wraps Zephyr sensor API (works with hundreds of existing drivers)

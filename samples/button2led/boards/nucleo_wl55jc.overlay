@@ -1,0 +1,42 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Button B1 to blue-LED pulses on Nucleo WL55JC.
+ *
+ * Short press: one LED pulse.
+ * Long press (>= 3 s): 5 pulses with a random 500-1500 ms gap.
+ */
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <4>;
+		buffer-size = <4>;
+
+		button_source: button-source {
+			compatible = "zstreamer,button-src";
+			gpios = <&gpioa 0 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			long-press-ms = <3000>;
+			children = <&led_pulse_node>;
+			long-press-children = <&burst_looper_node>;
+			autostart;
+		};
+
+		burst_looper_node: burst-looper {
+			compatible = "zstreamer,looper-node";
+			retransmit-count = <5>;
+			random-delay-min-ms = <500>;
+			random-delay-max-ms = <1500>;
+			children = <&led_pulse_node>;
+		};
+
+		/* Leaf node: pulses the LED and drops the buffer. */
+		led_pulse_node: led-pulse {
+			compatible = "zstreamer,gpio-pulse-node";
+			gpios = <&gpiob 15 GPIO_ACTIVE_HIGH>; /* blue LED1 */
+			hold-ms = <300>;
+			delay-ms = <0>;
+		};
+	};
+};

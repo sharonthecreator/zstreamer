@@ -1,0 +1,14 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: Button to LED pulses
+  description: |
+    Demonstrates button-src press-type routing and looper-node random
+    delays: a short press of B1 pulses the blue LED once via
+    gpio-pulse-node; a long press (>= 3 s) routes to a looper that
+    replays the pulse 5 times with a random 500-1500 ms gap.
+tests:
+  sample.zstreamer.button2led:
+    tags: zstreamer
+    platform_allow: nucleo_wl55jc
