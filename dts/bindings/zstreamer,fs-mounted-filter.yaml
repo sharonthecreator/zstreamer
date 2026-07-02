@@ -1,0 +1,15 @@
+description: |
+  Filesystem mount gate for zstreamer.
+  Checks once (on the first buffer) whether a filesystem is mounted at
+  mount-path. If mounted, passes all buffers to children. If not, drops
+  all buffers.
+
+compatible: "zstreamer,fs-mounted-filter"
+
+include: zstreamer,filter.yaml
+
+properties:
+  mount-path:
+    type: string
+    required: true
+    description: Filesystem mount path to check (e.g. "/SD:").

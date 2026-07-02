@@ -1,0 +1,110 @@
+description: |
+  Timer-triggered STM32 ADC source with circular DMA for continuous
+  capture (e.g. audio).
+
+  A hardware timer's TRGO triggers ADC conversions at sample-rate-hz.
+  DMA moves results in circular mode into a double buffer; half-transfer
+  and transfer-complete interrupts wake the source thread, which emits
+  one half-buffer per pipeline buffer as signed int16 PCM (DC offset
+  removed).  With the default oversampling (ratio 16, no shift) a 12-bit
+  ADC yields full-scale 16-bit samples.
+
+  STM32-only: uses STM32 LL for trigger, unlimited-DMA mode, sequencer
+  and oversampling setup.  Channel gain/reference/acquisition time come
+  from the ADC channel's own DTS child node via the standard Zephyr ADC
+  API, so the referenced ADC controller must be status "okay".  The ADC
+  instance is used exclusively by this node — do not adc_read() it from
+  elsewhere.
+
+  The driver cannot verify that the timer phandle actually routes to the
+  EXTSEL input named by st,trigger — check the chip reference manual.
+
+  Example (STM32U5, ADC4 + TIM6 + GPDMA1):
+
+    adc_dma_source: adc-dma-source {
+        compatible = "zstreamer,adc-dma-stm32-src";
+        io-channels = <&adc4 10>;
+        sample-rate-hz = <16000>;
+        timer = <&timers6>;
+        st,trigger = "tim6-trgo-adc4";
+        dmas = <&gpdma1 0 1 (STM32_DMA_PERIPH_RX |
+                             STM32_DMA_MEM_16BITS |
+                             STM32_DMA_PERIPH_16BITS)>;
+        dma-names = "rx";
+        children = <&some_filter>;
+        autostart;
+    };
+
+  Example (STM32WL55, ADC + TIM2 + DMA1/DMAMUX, request 5 = ADC):
+
+    adc_dma_source: adc-dma-source {
+        compatible = "zstreamer,adc-dma-stm32-src";
+        io-channels = <&adc1 3>;
+        sample-rate-hz = <16000>;
+        timer = <&timers2>;
+        st,trigger = "tim2-trgo";
+        dmas = <&dmamux1 0 5 (STM32_DMA_PERIPH_RX |
+                              STM32_DMA_MEM_16BITS |
+                              STM32_DMA_PERIPH_16BITS)>;
+        dma-names = "rx";
+        children = <&some_filter>;
+    };
+
+compatible: "zstreamer,adc-dma-stm32-src"
+
+include: zstreamer,src.yaml
+
+properties:
+  io-channels:
+    type: phandle-array
+    required: true
+    description: |
+      Single ADC channel to sample: <&adcN chan>.  The ADC register
+      base and sequencer flavor (st,adc-sequencer) are derived from the
+      referenced controller node at compile time.
+
+  sample-rate-hz:
+    type: int
+    required: true
+    description: Target sampling rate in Hz (e.g. 16000).
+
+  timer:
+    type: phandle
+    required: true
+    description: |
+      st,stm32-timers node whose update-event TRGO paces conversions.
+      Must be a master-capable timer wired to the ADC EXTSEL input
+      selected by st,trigger (chip-specific).
+
+  st,trigger:
+    type: string
+    required: true
+    description: |
+      ADC external trigger source, as the suffix of the series LL enum
+      LL_ADC_REG_TRIG_EXT_<TOKEN> (lowercased, '-' for '_'), e.g.
+      "tim6-trgo" -> LL_ADC_REG_TRIG_EXT_TIM6_TRGO.  On STM32U5's ADC4
+      the LL enums carry an _ADC4 suffix: use e.g. "tim6-trgo-adc4".
+      A trigger that doesn't exist on the target series fails to
+      compile.
+
+  oversampling-ratio:
+    type: int
+    default: 16
+    enum: [0, 2, 4, 8, 16, 32, 64, 128, 256]
+    description: |
+      Hardware oversampling ratio, no right shift (0 disables).  The
+      default 16 with a 12-bit ADC produces 16-bit samples, matching
+      the driver's int16 output convention.
+
+  dmas:
+    type: phandle-array
+    required: true
+    description: |
+      DMA channel spec.  The request line is taken from the "slot"
+      cell (GPDMA request / DMAMUX request ID); transfers are always
+      peripheral-to-memory, 16-bit.
+
+  dma-names:
+    type: string-array
+    required: true
+    description: Must be "rx".

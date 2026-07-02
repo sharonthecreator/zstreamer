@@ -15,4 +15,8 @@ rsource "pwm/Kconfig"
 
 rsource "lora/Kconfig"
 
+rsource "gpio/Kconfig"
+
+rsource "util/Kconfig"
+
 rsource "test/Kconfig"

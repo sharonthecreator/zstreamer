@@ -14,3 +14,17 @@ config ZSTREAMER_ADC_SRC
 	  Enable the ADC source streaming node driver.
 	  Captures ADC samples using Zephyr's portable ADC API
 	  (blocking adc_read in the source thread).
+
+config ZSTREAMER_ADC_DMA_STM32_SRC
+	bool "STM32 timer-triggered ADC DMA source driver"
+	depends on DT_HAS_ZSTREAMER_ADC_DMA_STM32_SRC_ENABLED
+	depends on ZSTREAMER
+	depends on ADC
+	depends on DMA
+	depends on SOC_FAMILY_STM32
+	select ZSTREAMER_ADC
+	help
+	  Enable the STM32 timer-triggered ADC DMA source driver.
+	  A timer's TRGO paces ADC conversions; circular DMA streams
+	  results into a double buffer emitted as int16 PCM.  Uses STM32
+	  LL for trigger/DMA-unlimited/oversampling setup.

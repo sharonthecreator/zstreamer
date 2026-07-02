@@ -1,0 +1,25 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_UTIL
+	bool
+
+config ZSTREAMER_UTIL_LOOPER_NODE
+	bool "Looper processor node driver"
+	depends on DT_HAS_ZSTREAMER_LOOPER_NODE_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_UTIL
+	help
+	  Enable the looper processor node driver.
+	  Retransmits each incoming buffer a configurable number of times,
+	  e.g. for reliability over lossy transports.
+
+config ZSTREAMER_UTIL_RANDOM_TIMER_SRC
+	bool "Random timer source driver"
+	depends on DT_HAS_ZSTREAMER_RANDOM_TIMER_SRC_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_UTIL
+	help
+	  Enable the random timer source streaming node driver.
+	  Emits an empty buffer at random intervals between configurable
+	  min and max seconds.
