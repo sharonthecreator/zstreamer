@@ -1,0 +1,14 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: ADC audio to UART
+  description: |
+    Demonstrates the STM32 timer-triggered ADC DMA source: TIM6 TRGO
+    paces ADC4 at 16 kHz, circular DMA double-buffers the samples, and
+    the pipeline streams them as raw int16 PCM out LPUART1 at 921600
+    baud (capture with an FTDI adapter on PG7).
+tests:
+  sample.zstreamer.adc2uart:
+    tags: zstreamer
+    platform_allow: nucleo_u5a5zj_q

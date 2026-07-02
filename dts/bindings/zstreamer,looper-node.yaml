@@ -3,6 +3,13 @@ description: |
   Retransmits each incoming net_buf a configurable number of times,
   e.g. for reliability over lossy transports.
 
+  The gap between retransmissions is either fixed (delay-ms) or drawn
+  uniformly from [random-delay-min-ms, random-delay-max-ms] per gap.
+  Configure exactly one of the two forms — setting delay-ms together
+  with the random-delay properties fails at build time.  Random delays
+  need a random source in the build (e.g. CONFIG_ENTROPY_GENERATOR=y
+  with an entropy driver).
+
 compatible: "zstreamer,looper-node"
 
 include: zstreamer,node.yaml
@@ -14,5 +21,19 @@ properties:
     description: Total number of times to forward each buffer.
   delay-ms:
     type: int
-    default: 0
-    description: Optional delay in milliseconds between retransmissions.
+    description: |
+      Fixed delay in milliseconds between retransmissions.  Omitted
+      (with no random-delay-* either) means no delay.  Mutually
+      exclusive with random-delay-min-ms/random-delay-max-ms.
+  random-delay-min-ms:
+    type: int
+    description: |
+      Lower bound (ms) of the uniform random delay between
+      retransmissions.  Requires random-delay-max-ms; mutually
+      exclusive with delay-ms.
+  random-delay-max-ms:
+    type: int
+    description: |
+      Upper bound (ms, inclusive) of the uniform random delay between
+      retransmissions.  Requires random-delay-min-ms; mutually
+      exclusive with delay-ms.

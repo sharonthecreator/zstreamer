@@ -1,0 +1,74 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * 16 kHz ADC capture streamed as raw int16 PCM over LPUART1.
+ *
+ * Analog input on PA5 (ADC4 channel 10, e.g. an analog mic module);
+ * PCM out on LPUART1 TX (PG7, Arduino header) at 921600 baud.
+ */
+
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <zephyr/dt-bindings/dma/stm32_dma.h>
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		/* buffer-size must equal the source's DMA half-buffer:
+		 * 3200 B = 1600 samples = 100 ms at 16 kHz. */
+		buffer-count = <8>;
+		buffer-size = <3200>;
+
+		adc_dma_source: adc-dma-source {
+			compatible = "zstreamer,adc-dma-stm32-src";
+			io-channels = <&adc4 10>;
+			sample-rate-hz = <16000>;
+			timer = <&timers6>;
+			/* U5 ADC4 LL trigger enums carry an _ADC4 suffix. */
+			st,trigger = "tim6-trgo-adc4";
+			dmas = <&gpdma1 0 1 (STM32_DMA_PERIPH_RX |
+					     STM32_DMA_MEM_16BITS |
+					     STM32_DMA_PERIPH_16BITS)>;
+			dma-names = "rx";
+			children = <&uart_sink_node>;
+			autostart;
+		};
+
+		uart_sink_node: uart-sink {
+			compatible = "zstreamer,uart-sink";
+			uart-device = <&lpuart1>;
+		};
+	};
+};
+
+&adc4 {
+	pinctrl-0 = <&adc4_in10_pa5>;
+	pinctrl-names = "default";
+	st,adc-clock-source = "ASYNC";
+	st,adc-prescaler = <8>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	channel@a {
+		reg = <10>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_TICKS, 40)>;
+		zephyr,resolution = <12>;
+	};
+};
+
+&gpdma1 {
+	status = "okay";
+};
+
+&timers6 {
+	status = "okay";
+	st,prescaler = <0>;
+};
+
+/* 16 kHz x 16-bit PCM = 32 kB/s; 921600 baud ~= 92 kB/s. */
+&lpuart1 {
+	current-speed = <921600>;
+};
