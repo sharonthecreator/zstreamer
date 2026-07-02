@@ -1,10 +1,30 @@
 description: |
   Button source for zstreamer.
 
-  Short press emits one empty buffer. A long press (held >= long-press-ms,
-  when long-press-ms > 0) enters "repeat mode": emits an empty buffer every
-  repeat-interval-ms for repeat-duration-ms, then returns to idle. Hold
-  detection is done by polling the GPIO level inside process().
+  Emits exactly one empty buffer per button press, routed by press type:
+  short presses go to children, long presses (held >= long-press-ms,
+  when long-press-ms > 0) go to long-press-children.  Hold detection is
+  done by polling the GPIO level inside process().
+
+  Periodic behavior is composed downstream instead of built in — e.g.
+  wire long-press-children to a looper-node to turn one long press into
+  N paced emissions:
+
+    button_src: button-src {
+        compatible = "zstreamer,button-src";
+        gpios = <&gpioc 13 GPIO_ACTIVE_HIGH>;
+        long-press-ms = <5000>;
+        children = <&encode_node>;
+        long-press-children = <&burst_looper>;
+        autostart;
+    };
+
+    burst_looper: burst-looper {
+        compatible = "zstreamer,looper-node";
+        retransmit-count = <90>;
+        delay-ms = <10000>;
+        children = <&encode_node>;
+    };
 
 compatible: "zstreamer,button-src"
 
@@ -20,18 +40,13 @@ properties:
     type: int
     default: 5000
     description: |
-      How long (ms) the button must stay held to trigger repeat mode.
-      Released before this threshold is treated as a short press (one
-      emit). 0 disables long-press detection entirely.
+      How long (ms) the button must stay held for the press to route to
+      long-press-children.  Released before this threshold is a short
+      press (routed to children).  0 disables long-press detection
+      entirely.
 
-  repeat-interval-ms:
-    type: int
-    default: 10000
-    description: Period (ms) between emits while in repeat mode.
-
-  repeat-duration-ms:
-    type: int
-    default: 900000
+  long-press-children:
+    type: phandles
     description: |
-      Total time (ms) repeat mode stays active before returning to idle.
-      Default 900000 = 15 minutes.
+      Downstream node(s) for long presses.  Omitted (or empty) means
+      long presses are dropped.
