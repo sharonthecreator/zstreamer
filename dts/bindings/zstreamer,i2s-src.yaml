@@ -1,0 +1,24 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  I2S source node. Configures the referenced I2S/SAI peripheral as
+  master receiver with 32-bit slots and streams the left channel as
+  int16 PCM (top 16 signal bits of each 24-bit-in-32 I2S word).
+  Suited to MEMS microphones like the INMP441, which require the
+  64-SCK-per-frame ratio that 32-bit slots produce.
+
+compatible: "zstreamer,i2s-src"
+
+include: zstreamer,src.yaml
+
+properties:
+  i2s-device:
+    type: phandle
+    required: true
+    description: I2S RX peripheral to capture from (e.g. an STM32 SAI block).
+
+  sample-rate-hz:
+    type: int
+    required: true
+    description: Frame clock (sample) rate in Hz.

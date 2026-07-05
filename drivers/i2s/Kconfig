@@ -1,0 +1,17 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_I2S
+	bool
+
+config ZSTREAMER_I2S_SRC
+	bool "I2S source driver"
+	depends on DT_HAS_ZSTREAMER_I2S_SRC_ENABLED
+	depends on ZSTREAMER
+	depends on I2S
+	select ZSTREAMER_I2S
+	help
+	  Enable the I2S source streaming node driver.
+	  Master-receives 32-bit-slot stereo I2S frames (e.g. from an
+	  INMP441 MEMS microphone via an STM32 SAI block) and emits the
+	  left channel as int16 PCM.
