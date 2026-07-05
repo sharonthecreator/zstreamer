@@ -1,0 +1,8 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  drivers.zstreamer.util:
+    tags: drivers zstreamer util
+    platform_allow:
+      - native_sim

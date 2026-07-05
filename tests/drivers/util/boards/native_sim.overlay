@@ -1,0 +1,24 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <8>;
+		buffer-size = <64>;
+
+		batcher: batcher {
+			compatible = "zstreamer,batch-node";
+			batch-count = <4>;
+			children = <&count_sinker>;
+			thread-priority = <10>;
+		};
+
+		count_sinker: count-sinker {
+			compatible = "zstreamer,count-sink";
+			thread-priority = <10>;
+		};
+	};
+};

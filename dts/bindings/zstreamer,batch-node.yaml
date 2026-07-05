@@ -1,0 +1,27 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Batch processor node for zstreamer.
+  Holds incoming net_bufs until batch-count have accumulated, then
+  releases them all downstream in arrival order.  Turns a steady
+  stream into periodic bursts — e.g. SD-card writes every N buffers
+  so the card idles between bursts.
+
+  Held buffers stay allocated from the shared graph pool, so
+  batch-count must stay below the graph's buffer-count by at least
+  the pipeline's working set (enforced at build time only against
+  buffer-count itself).  If the stream stops mid-batch, up to
+  batch-count - 1 buffers stay held until the stream resumes.
+
+compatible: "zstreamer,batch-node"
+
+include: zstreamer,node.yaml
+
+properties:
+  batch-count:
+    type: int
+    required: true
+    description: |
+      Number of buffers to accumulate before releasing the whole
+      batch downstream.

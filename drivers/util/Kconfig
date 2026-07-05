@@ -4,6 +4,17 @@
 config ZSTREAMER_UTIL
 	bool
 
+config ZSTREAMER_UTIL_BATCH_NODE
+	bool "Batch processor node driver"
+	depends on DT_HAS_ZSTREAMER_BATCH_NODE_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_UTIL
+	help
+	  Enable the batch processor node driver.
+	  Holds incoming buffers until batch-count have accumulated, then
+	  releases them all downstream in arrival order, e.g. to batch
+	  SD-card writes into periodic bursts.
+
 config ZSTREAMER_UTIL_LOOPER_NODE
 	bool "Looper processor node driver"
 	depends on DT_HAS_ZSTREAMER_LOOPER_NODE_ENABLED
