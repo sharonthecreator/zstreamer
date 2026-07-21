@@ -108,6 +108,7 @@ static int button_src_process(const struct device *dev, struct net_buf *buf)
 	}
 
 	/* Short press: framework distributes to children. */
+	LOG_INF("[%s] short press", dev->name);
 	return 0;
 }
 
