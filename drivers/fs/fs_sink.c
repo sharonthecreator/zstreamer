@@ -339,6 +339,24 @@ static int fs_sink_process(const struct device *dev, struct net_buf *buf) {
   return 0;
 }
 
+/**
+ * Stream event hook — a STOP event arrives in-band behind the last data
+ * buffer of a run, so closing here guarantees every byte of the stream
+ * is synced and the file is finalized without any application call.
+ * The next run lazily opens a fresh file on its first data buffer.
+ */
+static int fs_sink_handle_event(const struct device *dev,
+                                struct net_buf *buf) {
+  struct fs_sink_data *data = dev->data;
+
+  if (zstreamer_buf_type_get(buf) == ZSTREAMER_BUF_EVENT_STOP &&
+      data->file_opened) {
+    return close_current_file(dev);
+  }
+
+  return 0;
+}
+
 static int fs_sink_init(const struct device *dev) {
   struct fs_sink_data *data = dev->data;
 
@@ -355,6 +373,7 @@ static int fs_sink_init(const struct device *dev) {
 
 static const struct zstreamer_node_driver_api fs_sink_api = {
     .process = fs_sink_process,
+    .handle_event = fs_sink_handle_event,
 };
 
 int fs_sink_set_filename_handler(const struct device *dev,

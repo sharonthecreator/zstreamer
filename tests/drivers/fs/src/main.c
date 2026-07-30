@@ -324,6 +324,49 @@ ZTEST(zstreamer_fs, test_delta_devices_ready) {
   zassert_true(device_is_ready(delta_sink_dev), "delta sink not ready");
 }
 
+ZTEST(zstreamer_fs, test_stop_event_finalizes_file) {
+  struct fs_dirent entry;
+  int ret;
+
+  /*
+   * 150ms run with 100ms/buf → one buffer, no rotation threshold hit.
+   * The in-band STOP event must sync + close the file with no
+   * fs_sink_close() call: littlefs only reports a non-zero size once
+   * the file has been synced, so a stale-open file would stat as 0.
+   */
+  ret = zstreamer_source_start(delta_src_dev);
+  zassert_equal(ret, 0, "delta start: %d", ret);
+
+  k_msleep(150);
+
+  ret = zstreamer_source_stop(delta_src_dev);
+  zassert_equal(ret, 0, "delta stop: %d", ret);
+
+  /* Let the sink drain the stop event. */
+  k_msleep(50);
+
+  ret = fs_stat("/lfs/delta00000.bin", &entry);
+  zassert_equal(ret, 0, "delta file 0 missing: %d", ret);
+  zassert_true(entry.size > 0, "file not finalized by stop event");
+
+  /* The auto-close advanced the index: a second run gets its own file. */
+  ret = zstreamer_source_start(delta_src_dev);
+  zassert_equal(ret, 0, "second start: %d", ret);
+
+  k_msleep(150);
+
+  ret = zstreamer_source_stop(delta_src_dev);
+  zassert_equal(ret, 0, "second stop: %d", ret);
+
+  k_msleep(50);
+
+  ret = fs_stat("/lfs/delta00001.bin", &entry);
+  zassert_equal(ret, 0, "delta file 1 missing: %d", ret);
+  zassert_true(entry.size > 0, "second run's file not finalized");
+
+  assert_pool_free(graph_dev);
+}
+
 ZTEST(zstreamer_fs, test_delta_rotation) {
   struct fs_dirent entry;
   int ret;
