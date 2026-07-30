@@ -147,7 +147,9 @@ void zstreamer_node_thread_entry(void *p1, void *p2, void *p3) {
 /* Common init                                                         */
 /* ------------------------------------------------------------------ */
 
-int zstreamer_node_common_init(const struct device *dev) {
+int zstreamer_node_common_init_stack(const struct device *dev,
+                                     k_thread_stack_t *stack,
+                                     size_t stack_size) {
   struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
   const struct zstreamer_node_config *cfg =
       (const struct zstreamer_node_config *)dev->config;
@@ -155,11 +157,17 @@ int zstreamer_node_common_init(const struct device *dev) {
   data->dev = dev;
   k_fifo_init(&data->fifo);
 
-  k_thread_create(&data->thread, data->stack, ZSTREAMER_THREAD_STACK_SIZE,
-                  cfg->thread_entry, (void *)dev, NULL, NULL,
-                  cfg->thread_priority, 0, K_NO_WAIT);
+  k_thread_create(&data->thread, stack, stack_size, cfg->thread_entry,
+                  (void *)dev, NULL, NULL, cfg->thread_priority, 0, K_NO_WAIT);
 
   return 0;
+}
+
+int zstreamer_node_common_init(const struct device *dev) {
+  struct zstreamer_node_data *data = (struct zstreamer_node_data *)dev->data;
+
+  return zstreamer_node_common_init_stack(dev, data->stack,
+                                          ZSTREAMER_THREAD_STACK_SIZE);
 }
 
 /* ------------------------------------------------------------------ */

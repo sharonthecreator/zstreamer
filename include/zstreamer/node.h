@@ -173,6 +173,19 @@ struct net_buf *zstreamer_node_alloc_buf(const struct device *dev,
 extern int zstreamer_node_common_init(const struct device *dev);
 
 /**
+ * @brief Common init variant for nodes that need a custom thread stack.
+ *
+ * Identical to zstreamer_node_common_init() but creates the node
+ * thread on a driver-supplied stack.  For heavy-DSP nodes (e.g.
+ * codecs) whose process() cannot fit ZSTREAMER_THREAD_STACK_SIZE:
+ * define a dedicated K_THREAD_STACK in the driver and pass it here
+ * instead of raising the shared stack size.
+ */
+extern int zstreamer_node_common_init_stack(const struct device *dev,
+                                            k_thread_stack_t *stack,
+                                            size_t stack_size);
+
+/**
  * @brief Thread entry for through-nodes (processors).
  *
  * Declared here so ZSTREAMER_NODE_CONFIG_INIT can reference it.
