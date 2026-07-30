@@ -43,6 +43,59 @@ extern "C" {
 #define ZSTREAMER_THREAD_STACK_SIZE 2048
 
 /**
+ * @brief Buffer type carried in every graph buffer's user_data.
+ *
+ * Ordinary data buffers are ZSTREAMER_BUF_DATA (0, the alloc default —
+ * net_buf zeroes user_data on allocation).  Event buffers are
+ * zero-length in-band control markers that travel through the same
+ * fifos as data, so they stay ordered relative to the data around
+ * them.  Sources emit EVENT_START when a run begins and EVENT_STOP
+ * when it ends; the framework forwards events downstream and never
+ * passes them to process().
+ */
+enum zstreamer_buf_type {
+  ZSTREAMER_BUF_DATA = 0,
+  ZSTREAMER_BUF_EVENT_START,
+  ZSTREAMER_BUF_EVENT_STOP,
+};
+
+/**
+ * @brief Per-buffer metadata stored in net_buf user_data.
+ *
+ * The graph pool reserves sizeof(struct zstreamer_buf_meta) bytes of
+ * user_data on every buffer.  net_buf_clone() copies user_data, so
+ * the type survives copy-on-write distribution.
+ */
+struct zstreamer_buf_meta {
+  uint8_t type; /**< enum zstreamer_buf_type */
+};
+
+/** @brief Get the buffer type of a graph buffer. */
+static inline enum zstreamer_buf_type
+zstreamer_buf_type_get(const struct net_buf *buf) {
+  const struct zstreamer_buf_meta *meta = net_buf_user_data(buf);
+
+  if (buf->user_data_size < sizeof(*meta)) {
+    /* Buffer from a foreign pool without metadata: treat as data. */
+    return ZSTREAMER_BUF_DATA;
+  }
+  return (enum zstreamer_buf_type)meta->type;
+}
+
+/** @brief Set the buffer type of a graph buffer. */
+static inline void zstreamer_buf_type_set(struct net_buf *buf,
+                                          enum zstreamer_buf_type type) {
+  struct zstreamer_buf_meta *meta = net_buf_user_data(buf);
+
+  meta->type = (uint8_t)type;
+}
+
+/** @brief True if the buffer is an in-band event marker. */
+static inline bool zstreamer_buf_is_event(const struct net_buf *buf) {
+  return zstreamer_buf_type_get(buf) != ZSTREAMER_BUF_DATA;
+}
+
+/**
  * @brief Base configuration shared by every zstreamer node device.
  *
  * Type-specific config structs embed this as the first member named
@@ -85,9 +138,18 @@ struct zstreamer_node_data {
  *                Filter convention: 0 = false (route to false_children),
  *                1 = true (route to children), <0 = error.
  *                If the error is -EAGAIN, the buffer is unrefed silently.
+ * @param handle_event Optional. Called for each received event buffer
+ *                (events never reach process()).  Return 0 to let the
+ *                framework forward the event downstream (filters
+ *                forward to both child sets; sinks unref).  Return
+ *                -EAGAIN if the driver forwarded or consumed the event
+ *                itself — the framework then only drops its own ref.
+ *                Other negative values are logged and the event is
+ *                dropped.  A NULL handle_event behaves like returning 0.
  */
 __subsystem struct zstreamer_node_driver_api {
   int (*process)(const struct device *dev, struct net_buf *buf);
+  int (*handle_event)(const struct device *dev, struct net_buf *buf);
 };
 
 /**
@@ -131,6 +193,34 @@ extern void zstreamer_node_distribute(const struct device *dev,
  * @brief Drain (unref) all pending buffers from a fifo.
  */
 extern void zstreamer_node_drain_fifo(struct k_fifo *fifo);
+
+/**
+ * @brief Allocate a zero-length event buffer and distribute it to the
+ *        node's children.
+ *
+ * The event travels through the same fifos as data buffers, so it
+ * arrives downstream in order with the data emitted around it.
+ *
+ * @param dev     Any zstreamer node device.
+ * @param type    Event type (must not be ZSTREAMER_BUF_DATA).
+ * @param timeout Buffer allocation timeout.
+ * @return 0 on success, -ENOMEM if allocation timed out.
+ */
+int zstreamer_node_send_event(const struct device *dev,
+                              enum zstreamer_buf_type type,
+                              k_timeout_t timeout);
+
+/**
+ * @brief Run a node's handle_event hook and forward the event.
+ *
+ * Framework helper used by the thread entries: calls the driver's
+ * handle_event (if any) and, unless the driver consumed the event,
+ * distributes it to the given children.  Consumes the caller's ref.
+ */
+void zstreamer_node_dispatch_event(const struct device *dev,
+                                   struct net_buf *buf,
+                                   const struct device *const *children,
+                                   size_t num_children);
 
 /**
  * @brief Through-node config initializer.

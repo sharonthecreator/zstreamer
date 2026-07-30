@@ -45,6 +45,29 @@ void zstreamer_filter_thread_entry(void *p1, void *p2, void *p3) {
       continue;
     }
 
+    if (zstreamer_buf_is_event(buf)) {
+      int ret = (api->handle_event != NULL) ? api->handle_event(dev, buf) : 0;
+
+      if (ret != 0) {
+        /* Driver forwarded or consumed the event itself (-EAGAIN). */
+        if (ret != -EAGAIN) {
+          LOG_ERR("[%s] handle_event error: %d", dev->name, ret);
+        }
+        net_buf_unref(buf);
+        continue;
+      }
+
+      /* Events bypass routing: forward to both child sets so every
+       * downstream path sees the stream boundary. */
+      if (cfg->num_false_children > 0) {
+        zstreamer_node_distribute(dev, net_buf_ref(buf), cfg->false_children,
+                                  cfg->num_false_children);
+      }
+      zstreamer_node_distribute(dev, buf, cfg->common.children,
+                                cfg->common.num_children);
+      continue;
+    }
+
     int result = api->process(dev, buf);
 
     if (result < 0) {

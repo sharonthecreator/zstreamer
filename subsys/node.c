@@ -27,9 +27,11 @@ void zstreamer_node_distribute(const struct device *dev, struct net_buf *buf,
     child_data = (struct zstreamer_node_data *)children[i]->data;
     child_cfg = (const struct zstreamer_node_config *)children[i]->config;
 
-    /* Pass the buffer directly if the child node is readonly,
+    /* Pass the buffer directly if the child node is readonly, if it's
+     * an event (events are zero-length and immutable, never cloned),
      * or if it's the last child and the buffer has only one reference. */
-    if (child_cfg->readonly || (buf->ref == 1 && i == (num_children - 1))) {
+    if (child_cfg->readonly || zstreamer_buf_is_event(buf) ||
+        (buf->ref == 1 && i == (num_children - 1))) {
       buf = net_buf_ref(buf);
       k_fifo_put(&child_data->fifo, buf);
     }
@@ -57,6 +59,48 @@ void zstreamer_node_drain_fifo(struct k_fifo *fifo) {
 }
 
 /* ------------------------------------------------------------------ */
+/* In-band stream events                                              */
+/* ------------------------------------------------------------------ */
+
+int zstreamer_node_send_event(const struct device *dev,
+                              enum zstreamer_buf_type type,
+                              k_timeout_t timeout) {
+  const struct zstreamer_node_config *cfg =
+      (const struct zstreamer_node_config *)dev->config;
+  struct net_buf *buf = zstreamer_node_alloc_buf(dev, timeout);
+
+  if (buf == NULL) {
+    LOG_WRN("[%s] event %d alloc failed", dev->name, type);
+    return -ENOMEM;
+  }
+
+  zstreamer_buf_type_set(buf, type);
+  zstreamer_node_distribute(dev, buf, cfg->children, cfg->num_children);
+
+  return 0;
+}
+
+void zstreamer_node_dispatch_event(const struct device *dev,
+                                   struct net_buf *buf,
+                                   const struct device *const *children,
+                                   size_t num_children) {
+  const struct zstreamer_node_driver_api *api =
+      (const struct zstreamer_node_driver_api *)dev->api;
+  int ret = (api->handle_event != NULL) ? api->handle_event(dev, buf) : 0;
+
+  if (ret != 0) {
+    /* Driver forwarded or consumed the event itself (-EAGAIN). */
+    if (ret != -EAGAIN) {
+      LOG_ERR("[%s] handle_event error: %d", dev->name, ret);
+    }
+    net_buf_unref(buf);
+    return;
+  }
+
+  zstreamer_node_distribute(dev, buf, children, num_children);
+}
+
+/* ------------------------------------------------------------------ */
 /* Standard node thread entry                                         */
 /* ------------------------------------------------------------------ */
 
@@ -75,6 +119,12 @@ void zstreamer_node_thread_entry(void *p1, void *p2, void *p3) {
     struct net_buf *buf = k_fifo_get(&data->fifo, K_FOREVER);
 
     if (buf == NULL) {
+      continue;
+    }
+
+    if (zstreamer_buf_is_event(buf)) {
+      zstreamer_node_dispatch_event(dev, buf, cfg->children,
+                                    cfg->num_children);
       continue;
     }
 

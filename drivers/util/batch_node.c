@@ -69,6 +69,30 @@ static int batch_node_process(const struct device *dev, struct net_buf *buf)
 	return -EAGAIN;
 }
 
+static int batch_node_handle_event(const struct device *dev,
+				   struct net_buf *buf)
+{
+	const struct batch_node_config *cfg = dev->config;
+	struct batch_node_data *data = dev->data;
+
+	/* Flush the partial batch ahead of a stream stop so the event
+	 * stays ordered behind every data buffer of the run.  The
+	 * framework forwards the event itself after we return 0. */
+	if (zstreamer_buf_type_get(buf) == ZSTREAMER_BUF_EVENT_STOP) {
+		struct net_buf *held;
+
+		while ((held = k_fifo_get(&data->held_batch, K_NO_WAIT)) !=
+		       NULL) {
+			zstreamer_node_distribute(dev, held,
+						  cfg->common.children,
+						  cfg->common.num_children);
+		}
+		data->held_count = 0;
+	}
+
+	return 0;
+}
+
 static int batch_node_init(const struct device *dev)
 {
 	const struct batch_node_config *cfg = dev->config;
@@ -83,6 +107,7 @@ static int batch_node_init(const struct device *dev)
 
 static const struct zstreamer_node_driver_api batch_node_api = {
 	.process = batch_node_process,
+	.handle_event = batch_node_handle_event,
 };
 
 #define BATCH_NODE_DEFINE(inst)                                                                    \

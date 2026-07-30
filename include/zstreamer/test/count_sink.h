@@ -39,7 +39,23 @@ uint32_t count_sink_get_buf_count(const struct device *dev);
 uint32_t count_sink_get_byte_count(const struct device *dev);
 
 /**
- * @brief Reset the buffer and byte counters to zero.
+ * @brief Get the number of STREAM_START events received by a count-sink.
+ *
+ * @param dev Count-sink device.
+ * @return Number of start events received since last reset.
+ */
+uint32_t count_sink_get_start_event_count(const struct device *dev);
+
+/**
+ * @brief Get the number of STREAM_STOP events received by a count-sink.
+ *
+ * @param dev Count-sink device.
+ * @return Number of stop events received since last reset.
+ */
+uint32_t count_sink_get_stop_event_count(const struct device *dev);
+
+/**
+ * @brief Reset the buffer, byte, and event counters to zero.
  *
  * Must be called only while the upstream source is stopped.
  *

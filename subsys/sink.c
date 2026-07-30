@@ -40,6 +40,13 @@ void zstreamer_sink_thread_entry(void *p1, void *p2, void *p3) {
       continue;
     }
 
+    if (zstreamer_buf_is_event(buf)) {
+      /* Sinks have no children: the dispatch helper runs the driver's
+       * handle_event hook and then just drops the buffer. */
+      zstreamer_node_dispatch_event(dev, buf, NULL, 0);
+      continue;
+    }
+
     int ret = api->process(dev, buf);
 
     if (ret != 0) {

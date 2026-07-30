@@ -1,0 +1,8 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  subsys.zstreamer.events:
+    tags: subsys zstreamer events
+    platform_allow:
+      - native_sim

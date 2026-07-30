@@ -33,6 +33,11 @@ void zstreamer_source_thread_entry(void *p1, void *p2, void *p3) {
   while (true) {
     k_sem_take(&data->run_sem, K_FOREVER);
 
+    /* In-band stream start marker: travels ahead of the first data
+     * buffer through the same fifos, so downstream nodes see the
+     * stream boundary in order with the data. */
+    zstreamer_node_send_event(dev, ZSTREAMER_BUF_EVENT_START, K_MSEC(100));
+
     while (atomic_get(&data->running)) {
       struct net_buf *buf = zstreamer_node_alloc_buf(dev, K_MSEC(100));
 
@@ -57,6 +62,13 @@ void zstreamer_source_thread_entry(void *p1, void *p2, void *p3) {
                                 cfg->common.num_children);
       k_yield();
     }
+
+    /* In-band stream stop marker: queued behind the last data buffer
+     * so downstream nodes can flush and finalize (e.g. close files)
+     * only after all data of this run has passed.  Longer timeout than
+     * START: the pool drains once generation stops, and losing STOP
+     * means downstream never finalizes. */
+    zstreamer_node_send_event(dev, ZSTREAMER_BUF_EVENT_STOP, K_MSEC(500));
 
     k_sem_give(&data->idle_sem);
   }
