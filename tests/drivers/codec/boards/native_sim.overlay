@@ -1,0 +1,91 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* Enlarge flash to give LittleFS room for encoded stream files */
+&flash0 {
+	reg = <0x00000000 DT_SIZE_K(512)>;
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		lfs_partition: partition@0 {
+			label = "lfs";
+			reg = <0x00000000 DT_SIZE_K(512)>;
+		};
+	};
+};
+
+&flashcontroller0 {
+	reg = <0x00000000 DT_SIZE_K(512)>;
+};
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <12>;
+		/* Must hold one decoded 20ms/16kHz mono PCM frame (640 B) */
+		buffer-size = <768>;
+
+		/* Round-trip pipeline: sine -> encode -> decode -> count */
+		sine_source: sine-source {
+			compatible = "zstreamer,sine-src";
+			children = <&opus_enc>;
+			thread-priority = <10>;
+			cycle-ms = <100>;
+		};
+
+		opus_enc: opus-enc {
+			compatible = "zstreamer,opus-encode-node";
+			children = <&opus_dec>;
+			thread-priority = <10>;
+			sample-rate-hz = <16000>;
+			channels = <1>;
+			frame-ms = <20>;
+			bitrate-bps = <24000>;
+		};
+
+		opus_dec: opus-dec {
+			compatible = "zstreamer,opus-decode-node";
+			children = <&pcm_sinker>;
+			thread-priority = <10>;
+			sample-rate-hz = <16000>;
+			channels = <1>;
+		};
+
+		pcm_sinker: pcm-sinker {
+			compatible = "zstreamer,count-sink";
+			thread-priority = <10>;
+		};
+
+		/* File pipeline: sine -> encode -> fs_sink */
+		sine_file: sine-file {
+			compatible = "zstreamer,sine-src";
+			children = <&opus_enc_file>;
+			thread-priority = <10>;
+			cycle-ms = <100>;
+		};
+
+		opus_enc_file: opus-enc-file {
+			compatible = "zstreamer,opus-encode-node";
+			children = <&opus_fs_sinker>;
+			thread-priority = <10>;
+			sample-rate-hz = <16000>;
+			channels = <1>;
+			frame-ms = <20>;
+			bitrate-bps = <24000>;
+		};
+
+		opus_fs_sinker: opus-fs-sinker {
+			compatible = "zstreamer,fs-sink";
+			thread-priority = <10>;
+			mount-path = "/lfs";
+			filename-prefix = "opus";
+			size-threshold = <65536>;
+			file-count = <5>;
+		};
+	};
+};
