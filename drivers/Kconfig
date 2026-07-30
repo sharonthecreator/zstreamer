@@ -21,4 +21,6 @@ rsource "gpio/Kconfig"
 
 rsource "util/Kconfig"
 
+rsource "codec/Kconfig"
+
 rsource "test/Kconfig"

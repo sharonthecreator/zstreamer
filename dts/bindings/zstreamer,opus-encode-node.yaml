@@ -1,0 +1,39 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Opus encoder processor node. Consumes 16-bit little-endian
+  interleaved PCM and emits a self-delimiting encoded stream: a
+  12-byte stream header per stream start, then length-prefixed Opus
+  packets. A fresh header is emitted after every in-band stream START
+  event, so each stream segment (e.g. each file written by fs-sink)
+  is decodable on its own. On STOP the partial frame is zero-padded
+  and flushed ahead of the event.
+
+compatible: "zstreamer,opus-encode-node"
+
+include: zstreamer,node.yaml
+
+properties:
+  sample-rate-hz:
+    type: int
+    default: 16000
+    enum: [8000, 12000, 16000, 24000, 48000]
+    description: PCM sample rate of the input stream in Hz.
+
+  channels:
+    type: int
+    default: 1
+    enum: [1, 2]
+    description: Number of interleaved PCM channels.
+
+  frame-ms:
+    type: int
+    default: 20
+    enum: [10, 20, 40, 60]
+    description: Opus frame duration in milliseconds.
+
+  bitrate-bps:
+    type: int
+    default: 24000
+    description: Target Opus bitrate in bits per second.

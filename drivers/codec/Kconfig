@@ -1,0 +1,48 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+config ZSTREAMER_CODEC
+	bool
+
+config ZSTREAMER_OPUS
+	bool
+	help
+	  Build libopus (fixed-point, float API disabled, pseudostack)
+	  from the opus west project.  The pseudostack build keeps codec
+	  scratch memory out of thread stacks: libopus allocates a
+	  ~120 kB arena from the libc heap on the first codec call and
+	  becomes non-reentrant, so all libopus calls are serialized by
+	  a shared mutex.
+
+config ZSTREAMER_OPUS_ENCODE_NODE
+	bool "Opus encoder node driver"
+	depends on DT_HAS_ZSTREAMER_OPUS_ENCODE_NODE_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_CODEC
+	select ZSTREAMER_OPUS
+	help
+	  Enable the Opus encoder streaming node driver.
+	  Consumes 16-bit LE PCM and emits a self-delimiting stream of
+	  a 12-byte header plus length-prefixed Opus packets.
+
+config ZSTREAMER_OPUS_DECODE_NODE
+	bool "Opus decoder node driver"
+	depends on DT_HAS_ZSTREAMER_OPUS_DECODE_NODE_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_CODEC
+	select ZSTREAMER_OPUS
+	help
+	  Enable the Opus decoder streaming node driver.
+	  Parses the stream produced by the encoder node and emits
+	  16-bit LE PCM frames.
+
+config ZSTREAMER_OPUS_THREAD_STACK_SIZE
+	int "Opus codec node thread stack size"
+	depends on ZSTREAMER_OPUS
+	default 12288
+	help
+	  Stack size for Opus codec node threads.  Even with the
+	  pseudostack build (scratch in a heap arena), encode/decode
+	  calls need ~7.4 kB of real stack (measured on 32-bit x86),
+	  which cannot fit the fixed ZSTREAMER_THREAD_STACK_SIZE, so
+	  codec nodes run on their own larger stack.

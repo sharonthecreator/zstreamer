@@ -120,7 +120,8 @@ west build -b nucleo_u5a5zj_q samples/adc2uart
 ### Subsystem
 
 - [x] **CI** — GitHub Actions with clang-format, editorconfig, twister tests, and sample builds
-- [ ] **Buffer metadata** — standardized metadata header on `net_buf` (timestamps, sequence numbers, sample rate)
+- [x] **Stream events** — in-band STREAM_START/STOP markers flowing through the fifos with the data; sources emit them, drivers hook them via `handle_event` (e.g. `fs_sink` finalizes files on STOP)
+- [ ] **Buffer metadata** — standardized metadata header on `net_buf` (timestamps, sequence numbers, sample rate) — type field landed with stream events
 - [ ] **Buffer typing** — typed buffers (audio, raw, encoded, …) with type-negotiation between nodes, allowing drivers to register per-type `process` callbacks (preferably at compile-time)
 - [ ] **Runtime settings** — configure driver parameters (e.g. LoRa frequency, ADC sample rate) at runtime via Zephyr's `settings` subsystem, persisted across reboots
 - [ ] **Pipeline analyzer** — thread stack usage, buffer pool utilization, per-node throughput counters, and shell commands for live pipeline inspection
@@ -140,6 +141,7 @@ west build -b nucleo_u5a5zj_q samples/adc2uart
 - [x] **Random timer source** — empty-buffer ticks at a random interval
 - [x] **FS mount-gate filter** — pass/drop based on filesystem mount state
 - [x] **STM32 ADC DMA source** — timer-TRGO-paced circular-DMA capture
+- [x] **Opus encode/decode** — audio codec processors (real libopus, fixed-point); e.g. `adc_src -> opus_encode -> fs_sink` writes self-contained decodable files
 - [ ] **I2S source/sink** — audio streaming (mic-to-speaker, recording, DSP)
 - [ ] **BLE GATT sink/source** — wireless data over BLE notifications
 - [ ] **Sensor source** — wraps Zephyr sensor API (works with hundreds of existing drivers)

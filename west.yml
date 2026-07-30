@@ -21,6 +21,10 @@ manifest:
           - hal_stm32
           - littlefs
           - loramac-node
+    - name: opus
+      url: https://github.com/xiph/opus
+      revision: v1.5.2
+      path: modules/lib/opus
 
   self:
     path: modules/zstreamer

@@ -1,0 +1,29 @@
+# Copyright (c) 2026 sharonthecreator
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Opus decoder processor node. Parses the self-delimiting stream
+  produced by the opus-encode-node (12-byte stream header, then
+  length-prefixed Opus packets) and emits one buffer of 16-bit
+  little-endian interleaved PCM per decoded frame. Input buffer
+  boundaries may split headers and packets arbitrarily. The stream
+  header's sample rate and channel count must match this node's
+  properties; mismatched or corrupt input is dropped until the next
+  stream START event.
+
+compatible: "zstreamer,opus-decode-node"
+
+include: zstreamer,node.yaml
+
+properties:
+  sample-rate-hz:
+    type: int
+    default: 16000
+    enum: [8000, 12000, 16000, 24000, 48000]
+    description: PCM sample rate of the decoded output in Hz.
+
+  channels:
+    type: int
+    default: 1
+    enum: [1, 2]
+    description: Number of interleaved PCM channels.
