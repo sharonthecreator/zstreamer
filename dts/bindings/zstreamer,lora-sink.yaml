@@ -46,3 +46,20 @@ properties:
     default: 14
     description: |
       Transmit power in dBm.
+  switch-gpios:
+    type: phandle-array
+    description: |
+      Optional GPIO spec for a 2-position frequency-select switch, read once
+      at first configure. When set, overrides frequency with frequency-low
+      (pin reads 0) or frequency-high (pin reads 1). Omit to use frequency
+      unconditionally (backward-compatible default).
+  frequency-low:
+    type: int
+    description: |
+      Carrier frequency in Hz when switch-gpios reads 0. Only meaningful
+      with switch-gpios set; defaults to frequency if unset.
+  frequency-high:
+    type: int
+    description: |
+      Carrier frequency in Hz when switch-gpios reads 1. Only meaningful
+      with switch-gpios set; defaults to frequency if unset.

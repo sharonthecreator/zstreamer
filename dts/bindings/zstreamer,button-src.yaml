@@ -6,9 +6,10 @@ description: |
   when long-press-ms > 0) go to long-press-children.  Hold detection is
   done by polling the GPIO level inside process().
 
-  Periodic behavior is composed downstream instead of built in — e.g.
-  wire long-press-children to a looper-node to turn one long press into
-  N paced emissions:
+  For a one-shot fixed burst with no cancel/refresh behavior, periodic
+  emission can still be composed downstream instead — e.g. wire
+  long-press-children to a looper-node to turn one long press into N
+  paced emissions:
 
     button_src: button-src {
         compatible = "zstreamer,button-src";
@@ -25,6 +26,33 @@ description: |
         delay-ms = <10000>;
         children = <&encode_node>;
     };
+
+  A looper-node's retransmit loop blocks its caller for the full burst
+  duration, and here that caller would be button_src's own thread — so
+  the button could not react to any press for that whole span.  When a
+  long-held sequence needs to stay responsive to new presses (cancel on
+  short press, refresh on a repeated long press), use periodic-count /
+  periodic-interval-ms instead: button_src drives the repeat itself off
+  a system-workqueue timer, leaving its own thread free to keep polling
+  for presses:
+
+    button_src: button-src {
+        compatible = "zstreamer,button-src";
+        gpios = <&gpioc 13 GPIO_ACTIVE_HIGH>;
+        long-press-ms = <5000>;
+        children = <&encode_node>;
+        long-press-children = <&encode_node>;
+        periodic-count = <90>;
+        periodic-interval-ms = <10000>;
+        autostart;
+    };
+
+  A long press emits immediately, then re-emits to long-press-children
+  every periodic-interval-ms until periodic-count total emissions have
+  gone out.  A short press always emits to children as usual, and also
+  cancels an in-progress periodic sequence.  A long press while a
+  sequence is already running restarts it from the top (full count,
+  timer reset) rather than stacking a second one.
 
 compatible: "zstreamer,button-src"
 
@@ -50,3 +78,19 @@ properties:
     description: |
       Downstream node(s) for long presses.  Omitted (or empty) means
       long presses are dropped.
+
+  periodic-count:
+    type: int
+    description: |
+      Total number of emissions to long-press-children per long-press
+      sequence (the immediate one plus periodic-count - 1 more, paced
+      periodic-interval-ms apart), after which the sequence stops on
+      its own.  Omitted (or the pair below omitted) means a long press
+      emits exactly once, as if this feature didn't exist.  Must be
+      paired with periodic-interval-ms.
+
+  periodic-interval-ms:
+    type: int
+    description: |
+      Gap in ms between periodic re-emissions once a long press has
+      started a sequence.  Must be paired with periodic-count.
