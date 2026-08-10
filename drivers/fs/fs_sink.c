@@ -25,6 +25,7 @@ struct fs_sink_config {
   uint32_t size_threshold;
   uint32_t file_count;
   uint32_t max_write_size;
+  bool sync_each_buffer;
 };
 
 struct fs_sink_data {
@@ -333,6 +334,20 @@ static int fs_sink_process(const struct device *dev, struct net_buf *buf) {
     remaining -= written;
   }
 
+  /* Until the directory entry is updated the file still reads back as size 0,
+   * and rotation -- the only other thing that updates it -- is driven by the
+   * *next* buffer.  On a sparse stream that buffer may never come, so sync
+   * here.  Deliberately not a close: f_close is just f_sync plus a handle
+   * invalidation, while reopening would cost a directory scan. */
+  if (cfg->sync_each_buffer) {
+    ret = fs_sync(&data->current_file);
+    if (ret != 0) {
+      LOG_ERR("fs_sync failed: %d", ret);
+      close_current_file(dev);
+      return ret;
+    }
+  }
+
   LOG_DBG("[%s] wrote %u bytes (total %zu)", dev->name, buf->len,
           data->current_file_size);
 
@@ -420,6 +435,7 @@ void fs_sink_reset(const struct device *dev) {
       .size_threshold = DT_INST_PROP(inst, size_threshold),                    \
       .file_count = DT_INST_PROP(inst, file_count),                            \
       .max_write_size = DT_INST_PROP(inst, max_write_size),                    \
+      .sync_each_buffer = DT_INST_PROP(inst, sync_each_buffer),                \
   };                                                                           \
   DEVICE_DT_INST_DEFINE(inst, fs_sink_init, NULL, &fs_sink_data_##inst,        \
                         &fs_sink_config_##inst, POST_KERNEL,                   \

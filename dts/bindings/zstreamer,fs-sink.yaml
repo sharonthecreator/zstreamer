@@ -41,3 +41,14 @@ properties:
     type: int
     default: 0
     description: Max bytes per fs_write call. Large buffers are chunked. 0 = no limit.
+
+  sync-each-buffer:
+    type: boolean
+    description: >
+      fs_sync() after every buffer instead of only on rotation. Without it the
+      most recently written file is left open, and on FAT its directory entry
+      still reads size 0 until the *next* buffer triggers a rotation -- so a
+      reboot or power cut loses it. Set this on sparse streams, where that next
+      buffer may be hours away. Costs a directory-sector read plus a couple of
+      sector writes per buffer, so leave it off for continuous streams that
+      rotate often on their own.
