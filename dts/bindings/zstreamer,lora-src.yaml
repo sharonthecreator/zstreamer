@@ -6,6 +6,11 @@ description: |
   the received payload bytes. Uses the Zephyr LoRa driver API with
   blocking lora_recv().
 
+  With switch-gpios set, RX is broken off every couple of seconds to re-read
+  the switch, since lora_recv() cannot be aborted. Each break drops a packet
+  that happens to be mid-air, so expect a few percent loss and rely on
+  sender-side retransmits.
+
 compatible: "zstreamer,lora-src"
 
 include: zstreamer,src.yaml
@@ -50,8 +55,10 @@ properties:
   switch-gpios:
     type: phandle-array
     description: |
-      Optional GPIO spec for a 2-position frequency-select switch, read once
-      at first configure. When set, overrides frequency with frequency-low
+      Optional GPIO spec for a 2-position frequency-select switch, re-read
+      every couple of seconds so the band can be changed while running --
+      note this makes reception periodic rather than continuous (see the
+      node description). When set, overrides frequency with frequency-low
       (pin reads 0) or frequency-high (pin reads 1). Omit to use frequency
       unconditionally (backward-compatible default).
   frequency-low:

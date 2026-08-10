@@ -25,46 +25,59 @@ struct lora_sink_config {
 
 struct lora_sink_data {
 	struct zstreamer_sink_data common;
-	bool configured;
+	/* Carrier the radio is currently tuned to; 0 until the first successful
+	 * lora_config().  Comparing it against the live pin level is what makes
+	 * switch bounce a no-op -- only a settled, changed level reconfigures. */
+	uint32_t applied_frequency;
 };
 
+/* Called before every send: the radio is idle between packets, so the switch
+ * can be re-read and the band retuned without interrupting anything. */
 static int lora_sink_configure(const struct device *dev)
 {
 	const struct lora_sink_config *cfg = dev->config;
 	struct lora_sink_data *data = dev->data;
+	uint32_t frequency = cfg->modem_cfg.frequency;
 
-	if (data->configured) {
-		return 0;
-	}
-
-	if (!device_is_ready(cfg->lora_dev)) {
-		LOG_ERR("LoRa device not ready");
-		return -ENODEV;
-	}
-
-	struct lora_modem_config modem_cfg = cfg->modem_cfg;
-
-	if (cfg->switch_gpio.port != NULL) {
-		if (!gpio_is_ready_dt(&cfg->switch_gpio)) {
-			LOG_ERR("Frequency switch GPIO not ready");
+	if (data->applied_frequency == 0) {
+		if (!device_is_ready(cfg->lora_dev)) {
+			LOG_ERR("LoRa device not ready");
 			return -ENODEV;
 		}
 
-		int ret = gpio_pin_configure_dt(&cfg->switch_gpio, GPIO_INPUT);
+		if (cfg->switch_gpio.port != NULL) {
+			if (!gpio_is_ready_dt(&cfg->switch_gpio)) {
+				LOG_ERR("Frequency switch GPIO not ready");
+				return -ENODEV;
+			}
 
-		if (ret < 0) {
-			LOG_ERR("Failed to configure frequency switch GPIO: %d", ret);
-			return ret;
+			int ret = gpio_pin_configure_dt(&cfg->switch_gpio, GPIO_INPUT);
+
+			if (ret < 0) {
+				LOG_ERR("Failed to configure frequency switch GPIO: %d", ret);
+				return ret;
+			}
 		}
+	}
 
-		ret = gpio_pin_get_dt(&cfg->switch_gpio);
+	if (cfg->switch_gpio.port != NULL) {
+		int ret = gpio_pin_get_dt(&cfg->switch_gpio);
+
 		if (ret < 0) {
 			LOG_ERR("Failed to read frequency switch GPIO: %d", ret);
 			return ret;
 		}
 
-		modem_cfg.frequency = ret ? cfg->frequency_high : cfg->frequency_low;
+		frequency = ret ? cfg->frequency_high : cfg->frequency_low;
 	}
+
+	if (frequency == data->applied_frequency) {
+		return 0;
+	}
+
+	struct lora_modem_config modem_cfg = cfg->modem_cfg;
+
+	modem_cfg.frequency = frequency;
 
 	int ret = lora_config(cfg->lora_dev, &modem_cfg);
 
@@ -76,7 +89,7 @@ static int lora_sink_configure(const struct device *dev)
 	LOG_INF("LoRa sink %s: %u Hz, SF%u, BW%u, TX %d dBm", dev->name, modem_cfg.frequency,
 		modem_cfg.datarate, modem_cfg.bandwidth, modem_cfg.tx_power);
 
-	data->configured = true;
+	data->applied_frequency = frequency;
 	return 0;
 }
 
