@@ -6,10 +6,10 @@
  * (e.g. INMP441).  Configures the referenced I2S/SAI peripheral as
  * master RX with 32-bit slots (mics like the INMP441 require the
  * 64 SCK/frame ratio; 32 SCK/frame makes them output duplicated
- * samples plus broadband noise) and emits the left channel as int16
- * PCM.  process() loops i2s_read() until the net_buf is full, so one
- * emitted buffer spans graph buffer-size bytes regardless of the DMA
- * block size.
+ * samples plus broadband noise) and emits one channel (`channel`
+ * property) as int16 PCM.  process() loops i2s_read() until the
+ * net_buf is full, so one emitted buffer spans graph buffer-size
+ * bytes regardless of the DMA block size.
  */
 
 #define DT_DRV_COMPAT zstreamer_i2s_src
@@ -38,6 +38,9 @@ struct i2s_src_config {
 	struct zstreamer_source_config common;
 	const struct device *i2s_dev;
 	uint32_t sample_rate_hz;
+	/* Frame slot to keep: 0 = left, 1 = right.  Must match the mic's
+	 * channel-select strap -- the other slot is undriven. */
+	uint8_t slot;
 	struct k_mem_slab *slab;
 };
 
@@ -82,7 +85,7 @@ static int i2s_src_process(const struct device *dev, struct net_buf *buf)
 		for (size_t i = 0; i < samples; i++) {
 			/* Standard I2S puts the 24-bit word at slot bits [30:7] (bit 31
 			 * is the 1-SCK delay bit), so >>15 keeps the top 16 signal bits. */
-			dst[i] = (int16_t)(words[i * I2S_SRC_CHANNELS] >> 15);
+			dst[i] = (int16_t)(words[i * I2S_SRC_CHANNELS + cfg->slot] >> 15);
 		}
 
 		/* Free before looping so the DMA never starves for blocks. */
@@ -136,6 +139,7 @@ static int i2s_src_init(const struct device *dev)
 		.common = ZSTREAMER_SOURCE_CONFIG_INIT(inst),                                      \
 		.i2s_dev = DEVICE_DT_GET(DT_INST_PHANDLE(inst, i2s_device)),                       \
 		.sample_rate_hz = DT_INST_PROP(inst, sample_rate_hz),                              \
+		.slot = DT_INST_ENUM_IDX(inst, channel),                                           \
 		.slab = &i2s_src_slab_##inst,                                                      \
 	};                                                                                         \
 	DEVICE_DT_INST_DEFINE(inst, i2s_src_init, NULL, &i2s_src_data_##inst,                      \

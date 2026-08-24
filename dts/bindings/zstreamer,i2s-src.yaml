@@ -3,7 +3,7 @@
 
 description: |
   I2S source node. Configures the referenced I2S/SAI peripheral as
-  master receiver with 32-bit slots and streams the left channel as
+  master receiver with 32-bit slots and streams one channel as
   int16 PCM (top 16 signal bits of each 24-bit-in-32 I2S word).
   Suited to MEMS microphones like the INMP441, which require the
   64-SCK-per-frame ratio that 32-bit slots produce.
@@ -22,3 +22,14 @@ properties:
     type: int
     required: true
     description: Frame clock (sample) rate in Hz.
+
+  channel:
+    type: string
+    default: "left"
+    enum:
+      - "left"
+      - "right"
+    description: |
+      Which slot of the 2-slot I2S frame to keep.  Must match how the mic's
+      channel-select pin is strapped (INMP441 L/R: GND = left, VDD = right) --
+      a mismatch reads the undriven slot, whose contents are undefined.
