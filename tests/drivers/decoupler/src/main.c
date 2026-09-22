@@ -48,6 +48,23 @@ static void feed_buf(const struct device *dev, const void *contents, size_t len)
 	k_fifo_put(&node_data(dev)->fifo, buf);
 }
 
+static void feed_unaligned_buf(const struct device *dev, const void *contents, size_t len)
+{
+	struct net_buf *buf = zstreamer_node_alloc_buf(dev, K_MSEC(100));
+	size_t reserve = 1U;
+
+	zassert_not_null(buf, "buffer allocation failed");
+	if ((((uintptr_t)buf->data + reserve) % sizeof(uint32_t)) == 0U) {
+		reserve++;
+	}
+	net_buf_reserve(buf, reserve);
+	zassert_not_equal((uintptr_t)buf->data % sizeof(uint32_t), 0U,
+			  "test input is unexpectedly aligned");
+	zassert_true(net_buf_tailroom(buf) >= len, "test input is too large");
+	net_buf_add_mem(buf, contents, len);
+	k_fifo_put(&node_data(dev)->fifo, buf);
+}
+
 static struct net_buf *get_output(const struct device *sink)
 {
 	struct net_buf *buf = k_fifo_get(&node_data(sink)->fifo, K_MSEC(100));
@@ -140,6 +157,30 @@ ZTEST(zstreamer_decoupler, test_uint16_stereo_deinterleaving_and_fanout)
 	zassert_mem_equal(right->data, expected_right, sizeof(expected_right),
 			  "right samples are not deinterleaved");
 	zassert_equal_ptr(left, left_tap, "one channel's readonly children should share a buffer");
+
+	net_buf_unref(left);
+	net_buf_unref(left_tap);
+	net_buf_unref(right);
+}
+
+ZTEST(zstreamer_decoupler, test_uint16_unaligned_input)
+{
+	const uint16_t interleaved[] = {0x1001, 0x2001, 0x1002, 0x2002};
+	const uint16_t expected_left[] = {0x1001, 0x1002};
+	const uint16_t expected_right[] = {0x2001, 0x2002};
+	struct net_buf *left;
+	struct net_buf *left_tap;
+	struct net_buf *right;
+
+	feed_unaligned_buf(stereo_dev, interleaved, sizeof(interleaved));
+	left = get_output(left_sink_dev);
+	left_tap = get_output(left_tap_sink_dev);
+	right = get_output(right_sink_dev);
+
+	zassert_mem_equal(left->data, expected_left, sizeof(expected_left),
+			  "left samples are not deinterleaved");
+	zassert_mem_equal(right->data, expected_right, sizeof(expected_right),
+			  "right samples are not deinterleaved");
 
 	net_buf_unref(left);
 	net_buf_unref(left_tap);
