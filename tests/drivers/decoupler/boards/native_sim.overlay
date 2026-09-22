@@ -1,0 +1,35 @@
+/*
+ * Copyright (c) 2026 sharonthecreator
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	streaming_graph: streaming-graph {
+		compatible = "zstreamer,graph";
+		buffer-count = <12>;
+		buffer-size = <64>;
+
+		stereo_decoupler: stereo-decoupler {
+			compatible = "zstreamer,decoupler-node";
+			element-size = <2>;
+			left-children = <&left_sink &left_tap_sink>;
+			right-children = <&right_sink>;
+			thread-priority = <10>;
+		};
+
+		left_sink: left-sink {
+			compatible = "zstreamer,count-sink";
+			thread-priority = <10>;
+		};
+
+		left_tap_sink: left-tap-sink {
+			compatible = "zstreamer,count-sink";
+			thread-priority = <10>;
+		};
+
+		right_sink: right-sink {
+			compatible = "zstreamer,count-sink";
+			thread-priority = <10>;
+		};
+	};
+};

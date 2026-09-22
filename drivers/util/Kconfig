@@ -15,6 +15,16 @@ config ZSTREAMER_UTIL_BATCH_NODE
 	  releases them all downstream in arrival order, e.g. to batch
 	  SD-card writes into periodic bursts.
 
+config ZSTREAMER_UTIL_DECOUPLER_NODE
+	bool "Stereo decoupler node driver"
+	depends on DT_HAS_ZSTREAMER_DECOUPLER_NODE_ENABLED
+	depends on ZSTREAMER
+	select ZSTREAMER_UTIL
+	help
+	  Enable the decoupler processor node driver.
+	  Splits a left-right-interleaved input buffer into separate left and
+	  right buffers and routes each one to its own children list.
+
 config ZSTREAMER_UTIL_LOOPER_NODE
 	bool "Looper processor node driver"
 	depends on DT_HAS_ZSTREAMER_LOOPER_NODE_ENABLED
