@@ -11,7 +11,6 @@
 
 #define DT_DRV_COMPAT zstreamer_decoupler_node
 
-#include <stdint.h>
 #include <string.h>
 
 #include <zephyr/device.h>
@@ -69,34 +68,11 @@ static int decoupler_node_process(const struct device *dev, struct net_buf *buf)
 	net_buf_add(left_buf, channel_len);
 	net_buf_add(right_buf, channel_len);
 
-	if (cfg->element_size == sizeof(uint16_t)) {
-		const uint8_t *src = buf->data;
-		uint8_t *left = left_buf->data;
-		uint8_t *right = right_buf->data;
-
-		for (size_t frame_offset = 0; frame_offset < buf->len;
-		     frame_offset += sizeof(uint32_t)) {
-			uint32_t stereo_pair;
-
-			/* Fixed-size copies let the compiler emit an unaligned-safe load and
-			 * two stores without changing the samples' byte representation. */
-			memcpy(&stereo_pair, src, sizeof(stereo_pair));
-			memcpy(left, &stereo_pair, sizeof(uint16_t));
-			memcpy(right, (const uint8_t *)&stereo_pair + sizeof(uint16_t),
-			       sizeof(uint16_t));
-
-			src += sizeof(stereo_pair);
-			left += sizeof(uint16_t);
-			right += sizeof(uint16_t);
-		}
-	} else {
-		for (size_t frame_offset = 0, output_offset = 0; frame_offset < buf->len;
-		     frame_offset += frame_size, output_offset += cfg->element_size) {
-			memcpy(left_buf->data + output_offset, buf->data + frame_offset,
-			       cfg->element_size);
-			memcpy(right_buf->data + output_offset,
-			       buf->data + frame_offset + cfg->element_size, cfg->element_size);
-		}
+	for (size_t frame_offset = 0, output_offset = 0; frame_offset < buf->len;
+	     frame_offset += frame_size, output_offset += cfg->element_size) {
+		memcpy(left_buf->data + output_offset, buf->data + frame_offset, cfg->element_size);
+		memcpy(right_buf->data + output_offset,
+		       buf->data + frame_offset + cfg->element_size, cfg->element_size);
 	}
 
 	zstreamer_node_distribute(dev, left_buf, cfg->left_children, cfg->num_left_children);
