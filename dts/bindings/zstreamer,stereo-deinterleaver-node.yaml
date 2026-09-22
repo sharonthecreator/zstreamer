@@ -2,16 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 description: |
-  Stereo decoupler processor node for zstreamer.
+  16-bit stereo deinterleaver processor node for zstreamer.
 
-  The node treats each input buffer as left-right-interleaved elements and
-  emits separate left and right buffers.  For example, with element-size = <2>,
-  a uint16_t input laid out as left, right, left, right becomes one all-left
-  buffer sent to left-children and one all-right buffer sent to right-children:
+  The node treats each input buffer as interleaved 16-bit stereo samples and
+  emits separate left and right buffers. An input laid out as L0, R0, L1, R1
+  becomes an L0, L1 buffer sent to left-children and an R0, R1 buffer sent to
+  right-children. Sample signedness and byte order are preserved.
 
-    stereo-decoupler {
-      compatible = "zstreamer,decoupler-node";
-      element-size = <2>;
+    stereo-deinterleaver {
+      compatible = "zstreamer,stereo-deinterleaver-node";
       left-children = <&left_sink>;
       right-children = <&right_sink>;
     };
@@ -21,7 +20,7 @@ description: |
   buffer-count must be greater than two, in addition to any buffers needed
   elsewhere in the pipeline.
 
-compatible: "zstreamer,decoupler-node"
+compatible: "zstreamer,stereo-deinterleaver-node"
 
 include:
   - name: zstreamer,node.yaml
@@ -29,11 +28,6 @@ include:
       - children
 
 properties:
-  element-size:
-    type: int
-    required: true
-    description: Size of one left or right element in bytes.
-
   left-children:
     type: phandles
     required: true

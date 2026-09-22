@@ -14,7 +14,7 @@
 #include <zstreamer_test/helpers.h>
 
 #define GRAPH_NODE         DT_NODELABEL(streaming_graph)
-#define STEREO_NODE        DT_NODELABEL(stereo_decoupler)
+#define DEINTERLEAVER_NODE DT_NODELABEL(stereo_deinterleaver)
 #define LEFT_SINK_NODE     DT_NODELABEL(left_sink)
 #define LEFT_TAP_SINK_NODE DT_NODELABEL(left_tap_sink)
 #define RIGHT_SINK_NODE    DT_NODELABEL(right_sink)
@@ -22,7 +22,7 @@
 #define BUFFER_COUNT DT_PROP(GRAPH_NODE, buffer_count)
 
 static const struct device *graph_dev = DEVICE_DT_GET(GRAPH_NODE);
-static const struct device *stereo_dev = DEVICE_DT_GET(STEREO_NODE);
+static const struct device *deinterleaver_dev = DEVICE_DT_GET(DEINTERLEAVER_NODE);
 static const struct device *left_sink_dev = DEVICE_DT_GET(LEFT_SINK_NODE);
 static const struct device *left_tap_sink_dev = DEVICE_DT_GET(LEFT_TAP_SINK_NODE);
 static const struct device *right_sink_dev = DEVICE_DT_GET(RIGHT_SINK_NODE);
@@ -71,10 +71,10 @@ static void assert_sink_empty(const struct device *sink)
 	zassert_is_null(buf, "%s unexpectedly received a buffer", sink->name);
 }
 
-static void *decoupler_setup(void)
+static void *deinterleaver_setup(void)
 {
 	zassert_true(device_is_ready(graph_dev), "graph not ready");
-	zassert_true(device_is_ready(stereo_dev), "stereo decoupler not ready");
+	zassert_true(device_is_ready(deinterleaver_dev), "stereo deinterleaver not ready");
 
 	for (size_t i = 0; i < ARRAY_SIZE(sink_devs); i++) {
 		zassert_true(device_is_ready(sink_devs[i]), "%s not ready", sink_devs[i]->name);
@@ -84,7 +84,7 @@ static void *decoupler_setup(void)
 	return NULL;
 }
 
-static void decoupler_before(void *fixture)
+static void deinterleaver_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
 
@@ -93,7 +93,7 @@ static void decoupler_before(void *fixture)
 	}
 }
 
-static void decoupler_after(void *fixture)
+static void deinterleaver_after(void *fixture)
 {
 	ARG_UNUSED(fixture);
 
@@ -101,11 +101,11 @@ static void decoupler_after(void *fixture)
 	for (size_t i = 0; i < ARRAY_SIZE(sink_devs); i++) {
 		drain_sink(sink_devs[i]);
 	}
-	zstreamer_node_drain_fifo(&node_data(stereo_dev)->fifo);
+	zstreamer_node_drain_fifo(&node_data(deinterleaver_dev)->fifo);
 	assert_pool_free(graph_dev);
 }
 
-static void decoupler_teardown(void *fixture)
+static void deinterleaver_teardown(void *fixture)
 {
 	ARG_UNUSED(fixture);
 
@@ -114,10 +114,10 @@ static void decoupler_teardown(void *fixture)
 	}
 }
 
-ZTEST_SUITE(zstreamer_decoupler, NULL, decoupler_setup, decoupler_before, decoupler_after,
-	    decoupler_teardown);
+ZTEST_SUITE(zstreamer_stereo_deinterleaver, NULL, deinterleaver_setup, deinterleaver_before,
+	    deinterleaver_after, deinterleaver_teardown);
 
-ZTEST(zstreamer_decoupler, test_uint16_stereo_deinterleaving_and_fanout)
+ZTEST(zstreamer_stereo_deinterleaver, test_uint16_stereo_deinterleaving_and_fanout)
 {
 	const uint16_t interleaved[] = {
 		0x1001, 0x2001, 0x1002, 0x2002, 0x1003, 0x2003, 0x1004, 0x2004,
@@ -128,7 +128,7 @@ ZTEST(zstreamer_decoupler, test_uint16_stereo_deinterleaving_and_fanout)
 	struct net_buf *left_tap;
 	struct net_buf *right;
 
-	feed_buf(stereo_dev, interleaved, sizeof(interleaved));
+	feed_buf(deinterleaver_dev, interleaved, sizeof(interleaved));
 	left = get_output(left_sink_dev);
 	left_tap = get_output(left_tap_sink_dev);
 	right = get_output(right_sink_dev);
@@ -146,11 +146,11 @@ ZTEST(zstreamer_decoupler, test_uint16_stereo_deinterleaving_and_fanout)
 	net_buf_unref(right);
 }
 
-ZTEST(zstreamer_decoupler, test_partial_frame_is_dropped)
+ZTEST(zstreamer_stereo_deinterleaver, test_partial_frame_is_dropped)
 {
 	const uint8_t partial_stereo_frame[] = {0, 1, 2, 3, 4, 5};
 
-	feed_buf(stereo_dev, partial_stereo_frame, sizeof(partial_stereo_frame));
+	feed_buf(deinterleaver_dev, partial_stereo_frame, sizeof(partial_stereo_frame));
 	k_msleep(20);
 
 	assert_sink_empty(left_sink_dev);
@@ -158,19 +158,19 @@ ZTEST(zstreamer_decoupler, test_partial_frame_is_dropped)
 	assert_sink_empty(right_sink_dev);
 }
 
-ZTEST(zstreamer_decoupler, test_allocation_failure_does_not_publish_one_side)
+ZTEST(zstreamer_stereo_deinterleaver, test_allocation_failure_does_not_publish_one_side)
 {
 	struct net_buf *held[BUFFER_COUNT - 2];
 	const uint16_t interleaved[] = {0x1001, 0x2001};
 
 	for (size_t i = 0; i < ARRAY_SIZE(held); i++) {
-		held[i] = zstreamer_node_alloc_buf(stereo_dev, K_NO_WAIT);
+		held[i] = zstreamer_node_alloc_buf(deinterleaver_dev, K_NO_WAIT);
 		zassert_not_null(held[i], "failed to reserve pool buffer %zu", i);
 	}
 
 	/* The input consumes one of the two remaining buffers.  Only the left
 	 * buffer can then be allocated, so the node must roll it back. */
-	feed_buf(stereo_dev, interleaved, sizeof(interleaved));
+	feed_buf(deinterleaver_dev, interleaved, sizeof(interleaved));
 	k_msleep(20);
 
 	assert_sink_empty(left_sink_dev);

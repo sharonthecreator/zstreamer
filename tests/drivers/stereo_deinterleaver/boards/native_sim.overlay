@@ -9,9 +9,8 @@
 		buffer-count = <12>;
 		buffer-size = <64>;
 
-		stereo_decoupler: stereo-decoupler {
-			compatible = "zstreamer,decoupler-node";
-			element-size = <2>;
+		stereo_deinterleaver: stereo-deinterleaver {
+			compatible = "zstreamer,stereo-deinterleaver-node";
 			left-children = <&left_sink &left_tap_sink>;
 			right-children = <&right_sink>;
 			thread-priority = <10>;
